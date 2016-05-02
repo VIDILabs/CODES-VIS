@@ -1,0 +1,55 @@
+svg {
+    z-index: 99;
+    position: absolute;
+    user-select: none;
+    /*border: 1px solid #aaa;*/
+}
+
+canvas {
+    z-index: 1;
+    position: absolute;
+}
+.node rect {
+  cursor: move;
+  fill-opacity: 0.9;
+  shape-rendering: crispEdges;
+}
+
+.node text {
+  pointer-events: none;
+  text-shadow: 0 1px 0 #fff;
+}
+
+.link {
+  fill: none;
+  stroke: #aaa;
+  stroke-opacity: 0.4;
+
+}
+
+.link:hover {
+  stroke: #a3a079;
+  stroke-opacity: .8;
+}
+
+#layout-main {
+    margin: 10px;
+    /*padding: 30px;*/
+    /*position: relative;*/
+}
+
+.nav-icon-mts {
+    background-image: url("style/img/nav-icon3.png");
+    background-position: center center;
+    margin: 10px;
+    width: 36px;
+    background-size: 36px;
+}
+
+.nav-icon-coa {
+    background-image: url("style/img/nav-icon2.png");
+    background-position: center center;
+    width: 36px;
+    margin: 10px;
+    background-size: 36px;
+}

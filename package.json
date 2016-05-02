@@ -1,0 +1,34 @@
+{
+  "name": "CODES-VIS",
+  "version": "0.1.0",
+  "description": "A visual analytics system for supporting CODES",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/index.js"
+  },
+  "keywords": [
+    "visualization",
+    "visual analytics",
+    "data exploration",
+    "operating system",
+    "visual analysis as a service"
+  ],
+  "author": "Jianping Kelvin Li",
+  "license": "MIT",
+  "dependencies": {
+    "socket.io": "~1.3.6",
+    "express": "~4.13.3",
+    "body-parser": "~1.13.3"
+  },
+  "jam": {
+    "packageDir": "ui/jam",
+    "baseUrl": "ui",
+    "dependencies": {
+      "jquery": ">1.4.2",
+      "bootstrap": ">2.3.1"
+    }
+  },
+  "devDependencies": {
+    "jamjs": "^0.2.17"
+  }
+}
