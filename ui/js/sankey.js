@@ -1,7 +1,9 @@
+if(typeof(define) == "function") define(function(){return Sankey;});
+
 function Sankey(option){
     "use restrict";
-    var Colors = i2v.colors || require("..colors.js"),
-        ArrayOpt = p4.arrays || require("../arrays.js");
+    var Colors = i2v.colors,
+        ArrayOpt = p4.arrays;
 
     var option = option || {},
         svg = option.container.append('g') || {},

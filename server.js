@@ -26,7 +26,7 @@ app.use(bodyParser.urlencoded({extended: true}));
 
 var ctypes = require("../../p4/src/ctypes/ctypes.js"),
     cstore = require("../../p4/src/ctypes/cstore.js"),
-    csv = require("../../p4/src/io/csv.js");
+    csv = require("../../p4/src/io/node-dsv.js");
 //
 var terminalFile = "./data/dragonfly-terminals-nonmin.csv",
     routerFile = "./data/dragonfly-routers-nonmin-full.csv",

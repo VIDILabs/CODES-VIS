@@ -1,3 +1,5 @@
+if(typeof(define) == "function") define(function(){return topologyGraph; });
+
 function topologyGraph(option){
 
     var option = option || {},

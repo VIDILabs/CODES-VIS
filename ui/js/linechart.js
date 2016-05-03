@@ -1,3 +1,5 @@
+if(typeof(define) == "function") define(function(){return lineChart;})
+
 function lineChart(arg){
     "use strict";
     var linechart = {},
@@ -22,6 +24,7 @@ function lineChart(arg){
         formatY = option.formatY || function(d){return d};
 
     width -= padding.right+padding.left;
+
     var svg = i2v.Svg({
         width: width,
         height: height,

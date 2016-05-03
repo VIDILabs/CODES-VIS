@@ -26,26 +26,16 @@
           <div class="layout" id="layout-main"></div>
       </div>
     </div>
-    <script src="/jam/require.js"></script>
-    <script>
-        require(["jquery", "vixus/panel"],
-            function($) {
-                console.log(Panel);
-            }
-        )
-    </script>
-    <!-- <script src="lib/jquery-1.11.1.min.js"></script>
+    <script src="lib/jquery-1.11.1.min.js"></script>
     <script src="lib/bootstrap.min.js"></script>
+    <script src="/jam/require.js"></script>
     <script src="lib/p4.js"></script>
     <script src="lib/i2v.js"></script>
-    <script src="js/vixus.js"></script>
-    <script src="js/widget.js"></script>
-    <script src="js/mmts.js"></script>
-    <script src="js/linechart.js"></script>
     <script src="js/ring.js"></script>
-    <script src="js/histogram.js"></script>
-    <script src="js/topology.js"></script>
-    <script src="lib/svg-pan-zoom.min.js"></script>
-    <script src="main.js"></script> -->
+
+    <script>
+        require(["main"],function(main) { main(); });
+    </script>
+
   </body>
 </html>

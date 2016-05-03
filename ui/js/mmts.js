@@ -1,3 +1,5 @@
+if(typeof(define) == "function") define(function(){return mmtsPlot;})
+
 function mmtsPlot(arg){
     // "use strict";
     var mmts = {},

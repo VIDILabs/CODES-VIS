@@ -1,5 +1,10 @@
-function ringPlot(option){
+if(typeof(define) == "function") {
+    define("ringPlot", [], function(){return ringPlot;});
+    define("interLinks", [], function(){return interLinks;});
+    define("ringGrid", [], function(){return ringGrid;});
+}
 
+function ringPlot(option){
     var option = option || {},
         data = option.data || {},
         width = option.width || 500,
@@ -14,7 +19,6 @@ function ringPlot(option){
 
     var stats = {},
         features = Object.keys(vmap).map(function(k){return vmap[k];});
-        // stats = p4.stats(data,features);
 
     var ring = container.append("g");
     // if(container) {

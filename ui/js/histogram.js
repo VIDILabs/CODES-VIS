@@ -1,5 +1,6 @@
-function histogram(option){
+if(typeof(define) == "function") define(function(){return histogram;});
 
+function histogram(option){
     var option = option || {},
         data = option.data || {},
         width = option.width || 500,
@@ -131,28 +132,28 @@ function histogram(option){
             .css("text-anchor", "end")
             .text("min: " + p4.io.printformat(".2s")(stats[vmap.color].min));
 
-            bar.append("text")
-                .attr("y", position.y+height+20)
-                .attr("x", 0)
-                .attr("dy", ".91em")
-                .css("font-size", "20px")
-                .css("text-anchor", "center")
-                .text( option.granu + " : " + entity + " : " + vmap.color)
+        bar.append("text")
+            .attr("y", position.y+height+20)
+            .attr("x", 0)
+            .attr("dy", ".91em")
+            .css("font-size", "20px")
+            .css("text-anchor", "center")
+            .text( option.granu + " : " + entity + " : " + vmap.color);
 
-        //     var grad = histogram.append("defs")
-        //         .append("linearGradient")
-        //         .attr("id", "gradryg")
-        //         .attr("x1", "0%")
-        //         .attr("x2", "100%")
-        //         .attr("y1", "0%")
-        //         .attr("y2", "0%");
-        //     //
-        //     grad.append("stop")
-        //         .attr("offset", "0%" )
-        //         .attr("stop-color", "rgb(255,255,0)");
-        //     grad.append("stop")
-        //         .attr("offset", "50%" )
-        //         .attr("stop-color", "rgb(255,0,0)");
+        // var grad = histogram.append("defs")
+        //     .append("linearGradient")
+        //     .attr("id", "gradryg")
+        //     .attr("x1", "0%")
+        //     .attr("x2", "100%")
+        //     .attr("y1", "0%")
+        //     .attr("y2", "0%");
+        // //
+        // grad.append("stop")
+        //     .attr("offset", "0%" )
+        //     .attr("stop-color", "rgb(255,255,0)");
+        // grad.append("stop")
+        //     .attr("offset", "50%" )
+        //     .attr("stop-color", "rgb(255,0,0)");
         //
         //
         // bar.append("rect")
