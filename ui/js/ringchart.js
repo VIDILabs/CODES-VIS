@@ -13,6 +13,8 @@ function ringChart(option){
         color = option.color || 120,
         circle = option.circle || false;
 
+    var elements = [], vi;
+
     var stats = {},
         features = Object.keys(vmap).map(function(k){return vmap[k];});
 
@@ -59,23 +61,22 @@ function ringChart(option){
             n = data.length,
             interval = (end - start) / n;
 
-        var items = [];
+
         for(var i = 0; i<n; i++) {
             if(circle){
                 var cirSize = 0.5 * (outerRadius - innerRadius),
                     pos = coord(innerRadius + cirSize, start + 0.5*interval);
 
-                var vi = ring.append("circle")
+                vi = ring.append("circle")
                     .attr('cx', pos.x)
                     .attr('cy', pos.y)
                     .attr('r', Math.max(1, 0.5*getSize(data[i][vmap.size])))
                     .attr("fill", getColor(data[i][vmap.color]));
 
-                items.push(vi);
-                    // .attr("fill", "blue");
+
             } else {
                 var size  = getSize(data[i][vmap.size]);
-                var vi = 0;
+
                 if(size>0){
                     var arc = i2v.SvgArc({
                         outerRadius: innerRadius + size,
@@ -90,16 +91,44 @@ function ringChart(option){
                         .attr("class", "arc")
                         .attr("d", arc)
                         .attr("stroke-width", 0)
-                        // .attr("fill", color)
                         .attr("fill", getColor(data[i][vmap.color]));
-                        // .attr("fill-opacity", (data[i][feature] * c1 + c0) * 0.95 + 0.05);
-                    // if(!vmap.color && nodeType0.indexOf(data[i]["terminal_id"])>0) vi.attr("fill", "purple");
                 }
-                // items.push(vi);
+
             }
+            elements.push(vi);
             start += interval;
         }
         // ring.items = items;
+        ring.vi = elements;
+        return ring;
+    };
+
+    ring.update = function(data) {
+        var start = 0,
+            end =  2 * Math.PI,
+            n = data.length,
+            interval = (end - start) / n;
+        elements.forEach(function(d, i) {
+            if(circle){
+                d.attr('r', Math.max(1, 0.5*getSize(data[i][vmap.size])))
+                    .attr("fill", getColor(data[i][vmap.color]));
+            } else {
+                var size  = getSize(data[i][vmap.size]);
+                var arc = i2v.SvgArc({
+                    outerRadius: innerRadius + size,
+                    innerRadius: innerRadius,
+                    width: width,
+                    height: height,
+                    radianStart: start,
+                    radianEnd: start + interval,
+                });
+
+                d.attr("d", arc).attr("fill", getColor(data[i][vmap.color]));
+            }
+
+            start += interval;
+        });
+
         return ring;
     };
 

@@ -33,23 +33,39 @@ canvas {
 }
 
 #layout-main {
-    margin: 10px;
+    margin: 0 10px;
     /*padding: 30px;*/
     /*position: relative;*/
 }
 
+#topology-view {
+
+}
+
+.navbar-nav li.active {
+    border-bottom: 4px solid steelblue;
+}
+
 .nav-icon-mts {
-    background-image: url("style/img/nav-icon3.png");
+    background-image: url("/style/img/nav-icon3.png");
     background-position: center center;
     margin: 10px;
-    width: 36px;
-    background-size: 36px;
+    width: 32px;
+    background-size: 32px;
 }
 
 .nav-icon-coa {
-    background-image: url("style/img/nav-icon2.png");
+    background-image: url("/style/img/nav-icon2.png");
     background-position: center center;
-    width: 36px;
+    width: 32px;
     margin: 10px;
-    background-size: 36px;
+    background-size: 32px;
+}
+
+.nav-icon-data {
+    background-image: url("/style/img/data-icon.png");
+    background-position: center center;
+    width: 32px;
+    margin: 10px;
+    background-size: 32px;
 }

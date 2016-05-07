@@ -65,7 +65,7 @@ function mmtsPlot(arg){
         $float.py = pow(y * u_slope.y + u_c0.y, u_exponent) * 2.0 - 1.0;
         gl_Position = vec4(px, py, 0.0, 1.0);
 
-        if(r == 51.0) {
+        if(r == 10.0) {
             v_color = vec4(0.9, 0, 0, 1.0);
             gl_Position = vec4(px, py, 1.0, 1.0);
         } else {

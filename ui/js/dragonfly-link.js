@@ -22,11 +22,11 @@ function dragonflyLink(arg){
         return {x: x, y: y};
     }
 
-    var ring = container.append("g");
+    var ring = container.append("g"),
+        links = [];
 
     var stats = {},
         features = Object.keys(vmap).map(function(k){return vmap[k];});
-
 
     for(var f in dataRange) {
         stats[f] = {min: dataRange[f].min, max: dataRange[f].max};
@@ -96,14 +96,24 @@ function dragonflyLink(arg){
 
                 var path = ["M", src.x, src.y, "Q", cp.x, cp.y, dest.x, dest.y].join(' ');
 
-                var lines = ring.append("path")
+                var link = ring.append("path")
                     .attr("d", path)
-                    .attr("fill", "transparent")
-                    .attr("stroke-width",  c*0.7 + 0.3)
-                    .attr("stroke","orange")
-                    .attr("stroke-opacity", c*2);
+                    .css("fill", "transparent")
+                    .css("stroke-width",  0.5)
+                    .css("stroke","orange")
+                    .css("stroke-opacity", c);
+
+                links.push(link);
             }
         }
+
+        ring.update = function(data) {
+            links.forEach(function(link, i){
+                var c = data[i][vmap.color] * stats[vmap.color].slope + stats[vmap.color].const;
+                link.css("stroke-opacity", c);
+            })
+        }
+
         return ring;
     }
 

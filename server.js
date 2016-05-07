@@ -501,9 +501,9 @@ app.get('/topologydata/:timestamp', function(req, res){
     res.json(result);
 });
 
-app.get('/timerange/:start', function(req, res){
-    var start = req.params.start * SAMPLE_RATE,
-        end = (req.params.start+10) * SAMPLE_RATE,
+app.get('/timerange/:start/:end', function(req, res){
+    var start = parseInt(req.params.start),
+        end = parseInt(req.params.end),
         // end = req.params.end * SAMPLE_RATE,
         result = {
             terminal: { group: [], router: [], node: [] },
@@ -514,28 +514,26 @@ app.get('/timerange/:start', function(req, res){
 
         for(var g in DataStore[e]){
             var md = metadata[e][g],
-                size =  md.count,
+                size =  md.rankTotal * (end-start),
                 names = md.names,
                 col = DataStore[e][g].columns();
 
-
-            console.log(md.rankTotal);
+            console.log(md.rankTotal, metadata[e].stepTotal, size, names);
             for(var i = 0; i<md.rankTotal; i++){
                 result[e][g][i] = {};
                 names.forEach(function(n){
                     result[e][g][i][n] = 0;
+                    for(var t = start; t < end; t++){
+                        result[e][g][i][n] += col[n][i* metadata[e].stepTotal + t];
+                        // if(result[e][g][col["rank"][i]][n] < col[n][i])
+                        //     result[e][g][col["rank"][i]][n] = col[n][i];
+
+                    }
+                    result[e][g][i][n] /= (end-start);
                 });
+
             }
-            for(var i = 0; i < size; i++){
-                if(col["timestamp"][i] >= start && col["timestamp"]< end){
-                    var item = {};
-                    names.forEach(function(n){
-                        // result[e][g][col["rank"][i]][n] += col[n][i];
-                        if(result[e][g][col["rank"][i]][n] < col[n][i])
-                            result[e][g][col["rank"][i]][n] = col[n][i];
-                    });
-                }
-            }
+
         }
     }
     res.json(result);
@@ -573,9 +571,10 @@ app.get('/metadata', function(req, res){
     metadata.terminal.router.rankTotal = NUM_ROUTER;
     metadata.terminal.node.rankTotal = NUM_TERMINAL;
 
-    metadata.num_group = NUM_GROUP;
-    metadata.num_router = NUM_ROUTER;
-    metadata.terminal_per_group = TERMINAL_PER_GROUP;
+    metadata.numGroup = NUM_GROUP;
+    metadata.numRouter = NUM_ROUTER;
+    metadata.numTerminal = NUM_TERMINAL;
+    metadata.routerRadix = ROUTER_RADIX;
 
     res.json(metadata);
 });

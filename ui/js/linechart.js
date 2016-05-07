@@ -116,7 +116,7 @@ function lineChart(arg){
         // })
 
         var sx0 = x(initDomain[0]),
-            sw0 = x(initDomain[1])-sx0;
+            sw0 = x(initDomain[1]);
         selector.base = selector.append("rect")
             .attr("x", sx0)
             .attr("y", 0)
@@ -136,7 +136,7 @@ function lineChart(arg){
             .css("cursor", "ew-resize");
 
         selector.padRight = selector.append("rect")
-            .attr("x", sw0 )
+            .attr("x", sw0 + 6)
             .attr("y", 0)
             .attr("width", 6)
             .attr("height", height)
@@ -216,7 +216,6 @@ function lineChart(arg){
                     x1 = rect.right - svg.getBoundingClientRect().left - padding.left;
                 onchange([x.invert(x0), x.invert(x1)]);
             }
-
         }, false);
     }
 
@@ -229,7 +228,6 @@ function lineChart(arg){
         .css("text-anchor", "end")
         .css("font-weight", "bold")
         .text("Normalized Mean");
-
 
     Object.keys(series).forEach(function(si,j){
         var legendPos = width,
