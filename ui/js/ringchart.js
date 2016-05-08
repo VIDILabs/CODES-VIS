@@ -19,10 +19,7 @@ function ringChart(option){
         features = Object.keys(vmap).map(function(k){return vmap[k];});
 
     var ring = container.append("g");
-    // if(container) {
-    //     container = (typeof(container) == "string") ? document.getElementById(container) : container;
-    //     container.appendChild(ring);
-    // }
+
 
     for(var f in dataRange) {
         stats[f] = {min: dataRange[f].min, max: dataRange[f].max};
@@ -30,6 +27,14 @@ function ringChart(option){
         stats[f].slope = 1 / (stats[f].max - stats[f].min);
         stats[f].const = -1 / (stats[f].max - stats[f].min);
     }
+
+    // stats = p4.stats(data, features);
+    // features.forEach(function(f){
+    //     // stats[f] = {min: dataRange[f].min, max: dataRange[f].max};
+    //     if(stats[f].max == stats[f].min) stats[f].max += 0.0001;
+    //     stats[f].slope = 1 / (stats[f].max - stats[f].min);
+    //     stats[f].const = -1 / (stats[f].max - stats[f].min);
+    // });
     // console.log(vmap, stats);
     function coord(r, rad){
         var x = width/2 + r * Math.cos(rad),
@@ -100,6 +105,7 @@ function ringChart(option){
         }
         // ring.items = items;
         ring.vi = elements;
+
         return ring;
     };
 

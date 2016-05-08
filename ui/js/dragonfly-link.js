@@ -107,10 +107,14 @@ function dragonflyLink(arg){
             }
         }
 
-        ring.update = function(data) {
+        ring.update = function(data, filterRange) {
+            var filter = filterRange || [0, 1]
             links.forEach(function(link, i){
                 var c = data[i][vmap.color] * stats[vmap.color].slope + stats[vmap.color].const;
-                link.css("stroke-opacity", c);
+                if(c >= filter[0] && c <= filter[1])
+                    link.css("stroke-opacity", c);
+                else
+                    link.css("stroke-opacity", 0);
             })
         }
 

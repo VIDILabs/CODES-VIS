@@ -25,6 +25,14 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
         var entity = "terminal",
             granularity = "node";
 
+        function getRankPerGroup(e, g) {
+            var rg = {
+                router: {"group": 1, "router": NUM_ROUTER / NUM_GROUP, "node":  ROUTER_RADIX * NUM_ROUTER / NUM_GROUP},
+                terminal: {"group": 1, "router": NUM_ROUTER / NUM_GROUP, "node":  NUM_TERMINAL / NUM_GROUP}
+            };
+            return rg[e][g];
+        }
+
         /******************************
             Data Variables
         *******************************/
@@ -91,12 +99,6 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
         panelRight.style.float = "none";
         // panelRight.title = "Statistical View";
 
-        var topoView = i2v.Svg({width: 640, height: 640, container: panelRight.body, id: "topoView"}),
-            topoViewSVG = [];
-
-        topoView.setAttribute("id", "topoView");
-        topoView.style.position = "absolute";
-        topoView.style.margin = "20px 0 0 0";
 
         var selectViewRight = DropDownMenu({
             container: panelRight.header,
@@ -244,8 +246,14 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
                 numGroup: NUM_GROUP,
                 numRouter: NUM_ROUTER,
                 numTerminal: NUM_TERMINAL,
-                struct: struct
+                struct: struct,
+                onhover: function(groupId){
+                    panels.forEach(function(panel){
+                        panel.highlight(groupId, getRankPerGroup(panel.entity(), panel.granularity()));
+                    })
+                }
             });
+
 
             DropDownMenu({
                 container: summaryPanel.header,

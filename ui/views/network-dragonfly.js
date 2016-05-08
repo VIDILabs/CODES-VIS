@@ -20,7 +20,8 @@ define(dependencies, function(ringChart, ringGrid, interLinks){
             numGroup = option.numGroup,
             numRouter = option.numRouter,
             numTerminal = option.numTerminal,
-            struct = option.struct;
+            struct = option.struct,
+            onhover = option.onhover;
 
         var svg = i2v.Svg({width: 640, height: 640, container: container, id: "topoView"}),
             links;
@@ -76,8 +77,17 @@ define(dependencies, function(ringChart, ringGrid, interLinks){
                 innerRadius: 160,
                 outerRadius: 310,
                 count: numGroup,
-                container: svg
+                container: svg,
+                onhover: onhover
             });
+
+            svgPanZoom("#topoView", {
+                  zoomEnabled: true,
+                  controlIconsEnabled: true,
+                  fit: true,
+                  center: true,
+                  minZoom: 0.1
+              });
         }
 
         nv.update = function(stepStart, numStep){
@@ -103,8 +113,9 @@ define(dependencies, function(ringChart, ringGrid, interLinks){
             url: "/timerange/" + stepStart + "/" + (stepStart+numStep),
             dataType: "json"
         }).then(function(json){
-            console.log(json);
+            // console.log(json);
             init(json);
+
         });
         nv.rings = rings;
         return nv;

@@ -310,6 +310,8 @@ module.exports = colorbrewer;
   (factory((global.d3_scale = global.d3_scale || {}),global.d3_array,global.d3_collection,global.d3_interpolate,global.d3_format,global.d3_time,global.d3_time_format,global.d3_color));
 }(this, function (exports,d3Array,d3Collection,d3Interpolate,d3Format,d3Time,d3TimeFormat,d3Color) { 'use strict';
 
+  var version = "0.7.0";
+
   var array = Array.prototype;
 
   var map$1 = array.map;
@@ -1069,7 +1071,7 @@ module.exports = colorbrewer;
       return r ? t.reverse() : t;
     };
 
-    scale.tickFormat = function(specifier) {
+    scale.tickFormat = function(count, specifier) {
       return specifier == null ? tickFormat : format(specifier);
     };
 
@@ -1201,8 +1203,6 @@ module.exports = colorbrewer;
   function plasma() {
     return ramp(rangePlasma);
   }
-
-  var version = "0.6.4";
 
   exports.version = version;
   exports.scaleBand = band;
@@ -3464,8 +3464,10 @@ module.exports = colorbrewer;
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('d3-time')) :
   typeof define === 'function' && define.amd ? define(['exports', 'd3-time'], factory) :
-  (factory((global.d3_time_format = {}),global.d3_time));
+  (factory((global.d3_time_format = global.d3_time_format || {}),global.d3_time));
 }(this, function (exports,d3Time) { 'use strict';
+
+  var version = "0.3.2";
 
   function localDate(d) {
     if (0 <= d.y && d.y < 100) {
@@ -4226,12 +4228,12 @@ module.exports = colorbrewer;
   });
 
   var zhCN = locale$1({
-    dateTime: "%a %b %e %X %Y",
-    date: "%Y/%-m/%-d",
+    dateTime: "%x %A %X",
+    date: "%Y年%-m月%-d日",
     time: "%H:%M:%S",
     periods: ["上午", "下午"],
     days: ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"],
-    shortDays: ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"],
+    shortDays: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
     months: ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"],
     shortMonths: ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"]
   });
@@ -4260,13 +4262,11 @@ module.exports = colorbrewer;
   var utcFormat = locale.utcFormat;
   var utcParse = locale.utcParse;
 
-  var version = "0.3.1";
-
-  exports.version = version;
   exports.timeFormat = timeFormat;
   exports.timeParse = timeParse;
   exports.utcFormat = utcFormat;
   exports.utcParse = utcParse;
+  exports.version = version;
   exports.timeFormatLocale = locale$1;
   exports.timeFormatCaEs = caES;
   exports.timeFormatDeCh = deCH;
@@ -5025,22 +5025,18 @@ var root = typeof self == 'object' && self.self === self && self ||
 
 root.i2v = {
     visualization   : require("./viz"),
-    colors          : require("./colors"),
-    arrays          : require('./arrays'),
-    Metric          : require("./metric"),
-    Svg             : require("./svg/svg"),
-    SvgArc          : require("./svg/arc"),
-    WebGL           : require('./webgl/webgl'),
-    Selector        : require('./selector'),
-    svg: {
-        line        : require('./svg/line'),
-        area        : require('./svg/area'),
-        arc         : require('./svg/arc')
-    }
-    // svgArc         : require("./svg/arc"),
-    // svgBar         : require('./svg/bar')
-
-
+     colors          : require("./colors"),
+     arrays          : require('./arrays'),
+     Metric          : require("./metric"),
+     Svg             : require("./svg/svg"),
+     SvgArc          : require("./svg/arc"),
+     WebGL           : require('./webgl/webgl'),
+    //  Selector        : require('./selector'),
+     svg: {
+         line        : require('./svg/line'),
+         area        : require('./svg/area'),
+         arc         : require('./svg/arc')
+     }
     // modules: {
     //     pie         : require("./svg/modules/pie"),
     //     alluvial    : require("./svg/module/alluvial.js")
@@ -5048,7 +5044,7 @@ root.i2v = {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./arrays":10,"./colors":12,"./metric":14,"./selector":15,"./svg/arc":16,"./svg/area":17,"./svg/line":18,"./svg/svg":19,"./viz":20,"./webgl/webgl":21}],14:[function(require,module,exports){
+},{"./arrays":10,"./colors":12,"./metric":14,"./svg/arc":15,"./svg/area":16,"./svg/line":17,"./svg/svg":18,"./viz":19,"./webgl/webgl":20}],14:[function(require,module,exports){
 module.exports = function Metric(arg) {
     "use strict";
 
@@ -5107,10 +5103,6 @@ module.exports = function Metric(arg) {
             return range[0] + (domain.indexOf(v)+0.5) / domain.length * (range[1] - range[0]);
         }
     };
-
-    metric.invert = function(r) {
-        return domain[0] + (r - range[0]) / (range[1] - range[0]) * (domain[1] - domain[0]);
-    }
 
     metric.interval = function() {
         if (scale == "ordinal" || scale == "categorical")
@@ -5186,143 +5178,6 @@ function linearInterpolate(domain, range) {
 }
 
 },{}],15:[function(require,module,exports){
-module.exports = function Selector(arg){
-    "use restrict";
-    var selector = {},
-        option = arg || {},
-        container = option.container || {},
-        width = option.width || container.clientWidth,
-        height = option.height || container.clientHeight,
-        px = option.x || 0,
-        py = option.y || 0,
-        offset = option.offset || {x: 0, y: 0},
-        fixedWidth = option.fixedWidth || null,
-        fixedHeight = option.fixedHeight || null,
-        onselect = option.onselect || function(){},
-        onmove = option.onmove || function(){};
-
-    var base = container.append("g")
-        .attr("class", "selector");
-
-    var substrate = base.append("rect")
-        .attr("class", "selector-base")
-        .attr("x", offset.x)
-        .attr("y", offset.y)
-        .attr("width", width)
-        .attr("height", height)
-        .attr("fill", "#aaa")
-        .attr("fill-opacity", 0)
-        .attr("stroke", "none")
-        .css("cursor", "crosshair");
-
-    var selector = base.append("rect")
-        .attr("class", "selector-controller")
-        .attr("x", 0)
-        .attr("y", 0)
-        .attr("width", px)
-        .attr("height",py)
-        .attr("fill-opacity", 0.2)
-        .css("fill", "#888")
-        .css("stroke", "#FFFFFF")
-        .css("cursor", "move");
-
-    var sx, sy, sp = {x: 0, y: 0, width: 0, height: 0}, dx, dy, intStart = false, drag = false, tx=0, ty=0, outOfBound = false;
-
-    base.addEventListener("mousedown", function(evt){
-        evt.preventDefault();
-        var rect = base.getBoundingClientRect(),
-            offsetX = evt.clientX - rect.left,
-            offsetY = evt.clientY - rect.top;
-
-        console.log(evt.clientX, offsetX);
-        intStart = true;
-        sx = offsetX ;
-        sy = offsetY ;
-
-        console.log(evt.offsetX, evt.clientX, base.getBoundingClientRect());
-        if(sx>sp.x && sy>sp.y && sx<sp.x+sp.width && sy<sp.y+sp.height) drag = true;
-
-        if(!drag){
-            tx=0;
-            ty=0;
-            selector.attr("x", sx)
-                .attr("y", sy)
-                .attr("width", 0)
-                .attr("height", 0).attr("transform", "translate(0,0)");
-        }
-
-        ondrag = function(evt){
-            if(intStart){
-                var rect = base.getBoundingClientRect(),
-                    offsetX = evt.clientX - rect.left,
-                    offsetY = evt.clientY - rect.top;
-
-                if(!(offsetX > width || offsetX < 0)) dx = offsetX - sx;
-                if(!(offsetY > height || offsetY < 0)) dy = offsetY - sy;
-
-                if(drag){
-                    var boundX0 = parseInt(selector.attr("x"))+(dx+tx),
-                        boundX1 = boundX0 + parseInt(selector.attr("width")),
-                        boundY0 = parseInt(selector.attr("y"))+(dy+ty),
-                        boundY1 = boundY0 + parseInt(selector.attr("height")),
-                        tlx = dx,
-                        tly = dy;
-
-                    if(!(boundX0 < px || boundX1 > px + width)) {
-                        tlx = (dx+tx)
-                        sp.x = parseInt(selector.attr("x")) + tlx;
-                    }
-
-                    if(!(boundY0 < py || boundY1 > py + height)) {
-                        tly = (dy+ty);
-                        sp.y = parseInt(selector.attr("y"))+tly;
-                    }
-
-                    selector.attr("transform", "translate(" + tlx + " , " + tly + ")");
-
-                } else {
-                    var sw = (fixedWidth) || Math.abs(dx),
-                        sh = (fixedHeight) || Math.abs(dy);
-
-                    selector
-                        .attr("width", sw)
-                        .attr("height", sh);
-
-                    if(dy<0 && dx>=0) selector.attr("y", sy+dy ); //selector.attr("y", sy+ );
-                    if(dx<0 && dy>=0) selector.attr("x", sx+dx );
-                    if(dx<0 && dy<0) selector.attr("x", sx+dx ).attr("y", sy+dy );
-                    // console.log(sp);
-                    sp.x = parseInt(selector.attr("x"));
-                    sp.y = parseInt(selector.attr("y"));
-                    sp.width = parseInt(selector.attr("width"));
-                    sp.height = parseInt(selector.attr("height"));
-                }
-
-                onmove(sp);
-            }
-        };
-
-        window.addEventListener("mousemove", ondrag, false);
-        window.addEventListener("mouseup", function(evt){
-            if(intStart){
-                intStart = false;
-                if(drag){
-                    tx += dx;
-                    ty += dy;
-                    drag = false;
-                }
-                onselect(sp);
-            }
-            window.removeEventListener("mousemove", ondrag, false);
-
-        });
-
-    });
-
-
-};
-
-},{}],16:[function(require,module,exports){
 module.exports = function Arc(arg) {
     "use strict";
 
@@ -5363,7 +5218,7 @@ module.exports = function Arc(arg) {
     return outerArcPath.concat(innerArcPath).join(" ");
 };
 
-},{}],17:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 var line = require('./line'),
     opt = require('../arrays');
 
@@ -5396,7 +5251,7 @@ module.exports = function area(option){
     return area;
 };
 
-},{"../arrays":10,"./line":18}],18:[function(require,module,exports){
+},{"../arrays":10,"./line":17}],17:[function(require,module,exports){
 module.exports = function line(option){
     "use restrict";
     var option = option || {},
@@ -5430,7 +5285,7 @@ module.exports = function line(option){
     return line;
 };
 
-},{}],19:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 var Metric = require('../metric') || i2v.Metric;
 var d3s = require('d3-scale');
 
@@ -5696,7 +5551,7 @@ module.exports = function Svg(arg){
     return svg;
 };
 
-},{"../metric":14,"d3-scale":2}],20:[function(require,module,exports){
+},{"../metric":14,"d3-scale":2}],19:[function(require,module,exports){
 var Class = require("./class");
 
 module.exports = Class.create(function Viz(arg){
@@ -5772,7 +5627,7 @@ module.exports = Class.create(function Viz(arg){
     return viz.init();
 });
 
-},{"./class":11}],21:[function(require,module,exports){
+},{"./class":11}],20:[function(require,module,exports){
 module.exports = function WebGL(option){
     "use strict;"
     var webgl = {},
@@ -5805,6 +5660,7 @@ module.exports = function WebGL(option){
     ctx = setupWebGL(canvas);
     ctx.getExtension("OES_texture_float");
     ctx.getExtension("OES_texture_float_linear");
+    ctx.ext = ctx.getExtension("ANGLE_instanced_arrays");
 
     if(container) {
         container = (typeof(container) == "string") ? document.getElementById(container) : container;
@@ -5894,6 +5750,7 @@ module.exports = function WebGL(option){
         attribute[name].location = ctx.getAttribLocation(program, name);
         ctx.vertexAttribPointer(attribute[name].location, size, ctx.FLOAT, false, 0, 0);
         ctx.enableVertexAttribArray(attribute[name].location);
+        // ctx.ext.vertexAttribDivisorANGLE(attribute[name].location, attribute[name].location);
     }
 
     function setTexture(name, tex){

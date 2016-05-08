@@ -14,6 +14,7 @@ define( ['vui/panel', 'vui/dropdown', 'js/mmts'], function(Panel, DropDownMenu, 
             plot,
             entity = option.entity || "terminal",
             granularity = option.granularity || "node",
+            metadata = option.metadata,
             changeSelectedAttriubte = false;
 
         var panel = Panel({
@@ -115,9 +116,11 @@ define( ['vui/panel', 'vui/dropdown', 'js/mmts'], function(Panel, DropDownMenu, 
                 alpha: alpha[granularity],
                 // color: tsColor(attributes[0]),
                 // aggregation: binAggregatedData,
-                formatX: function(d) { return p4.io.printformat(".2s")(d / 1000000) + "ms"; },
+                formatX: function(d) { return p4.io.printformat(".3s")(d / 1000000) + "ms"; },
                 formatY: p4.io.printformat(".2s")
             });
+
+            widget.highlight = plot.highlight;
         }
 
         widget.entity = function() {
@@ -131,6 +134,9 @@ define( ['vui/panel', 'vui/dropdown', 'js/mmts'], function(Panel, DropDownMenu, 
         widget.attribute = function() {
             return attributes[selectedAttribute];
         }
+
+
+
 
         widget.clear = panel.clear;
         widget.menu = menu;

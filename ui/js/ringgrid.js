@@ -12,6 +12,8 @@ function ringGrid(option){
 
     var ring =  container.append("g");
 
+    ring.onhover = option.onhover || function(){};
+
     ring.init = function() {
         function coord(r, rad){
             var x = width/2 + r * Math.cos(rad),
@@ -34,12 +36,37 @@ function ringGrid(option){
                 .attr("stroke-width", 0.5)
                 .attr("stroke", "#222");
 
-            var tc = coord(outerRadius-10, start + interval/2);
+            var arc = i2v.SvgArc({
+                outerRadius: outerRadius,
+                innerRadius: innerRadius,
+                width: width,
+                height: height,
+                radianStart: start,
+                radianEnd: start + interval,
+            });
 
+            var tc = coord(outerRadius-10, start + interval/2);
             ring.append("text")
                 .attr("x", tc.x-9)
                 .attr("y", tc.y+5)
                 .text(i);
+
+            var pad = ring.append("path")
+                .attr("class", "arc")
+                .attr("group_id", i)
+                .attr("d", arc)
+                .css("stroke", "orange")
+                .css("stroke-width", 0)
+                .css("fill", "transparent");
+
+            pad.onmouseover = function() {
+                ring.onhover(this.attr("group_id"));
+                this.css("stroke-width", 2);
+            }
+
+            pad.onmouseout = function() {
+                this.css("stroke-width", 0);
+            }
 
             start += interval;
         }
