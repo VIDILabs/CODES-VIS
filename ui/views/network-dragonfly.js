@@ -71,15 +71,24 @@ define(dependencies, function(ringChart, ringGrid, interLinks){
                 // color: s.color || 120,
                 // circle: s.circle,
             });
-            var gg = ringGrid({
+            var groupGrid = ringGrid({
                 width: 620,
                 height: 620,
                 innerRadius: 160,
                 outerRadius: 310,
                 count: numGroup,
                 container: svg,
-                onhover: onhover
+                onhover: function(d) {
+                    onhover(d);
+                    links.select(d);
+                }
             });
+
+            //remove all highlights when the mouse leaves SVG
+            groupGrid.onmouseleave = function() {
+                onhover(-1);
+                links.select(-1);
+            }
 
             svgPanZoom("#topoView", {
                   zoomEnabled: true,
@@ -87,7 +96,8 @@ define(dependencies, function(ringChart, ringGrid, interLinks){
                   fit: true,
                   center: true,
                   minZoom: 0.1
-              });
+             });
+
         }
 
         nv.update = function(stepStart, numStep){

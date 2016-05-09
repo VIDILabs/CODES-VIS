@@ -44,28 +44,41 @@ canvas {
 
 .navbar-nav li.active {
     border-bottom: 4px solid steelblue;
+    background-color: #e7e7e7;
 }
+
+/*.navbar-nav li a {
+    color: #222;
+    font-weight: bold;
+    font-size: 20px;
+    display: block;
+    min-width: 100px;
+}*/
+
 
 .nav-icon-mts {
     background-image: url("/style/img/nav-icon3.png");
-    background-position: center center;
+    background-position: left center;
     margin: 10px;
     width: 32px;
     background-size: 32px;
+    background-repeat: no-repeat;
 }
 
 .nav-icon-coa {
     background-image: url("/style/img/nav-icon2.png");
-    background-position: center center;
+    background-position: left center;
     width: 32px;
     margin: 10px;
     background-size: 32px;
+    background-repeat: no-repeat;
 }
 
 .nav-icon-data {
     background-image: url("/style/img/data-icon.png");
-    background-position: center center;
+    background-position: left center;
     width: 32px;
     margin: 10px;
     background-size: 32px;
+    background-repeat: no-repeat;
 }

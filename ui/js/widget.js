@@ -1,4 +1,6 @@
-define( ['vui/panel', 'vui/dropdown', 'js/mmts'], function(Panel, DropDownMenu, mmtsPlot){
+var deps = ['vui/panel', 'vui/dropdown', 'js/mmts', 'js/glHeatmap'];
+
+define(deps, function(Panel, DropDownMenu, mmtsPlot, glHeatmap){
     return function Widget(arg) {
         'use strict;'
         var widget = {},
@@ -15,7 +17,12 @@ define( ['vui/panel', 'vui/dropdown', 'js/mmts'], function(Panel, DropDownMenu, 
             entity = option.entity || "terminal",
             granularity = option.granularity || "node",
             metadata = option.metadata,
-            changeSelectedAttriubte = false;
+            changeSelectedAttriubte = false,
+            visualizations = {
+                "time series": mmtsPlot,
+                "heatmap": glHeatmap
+            },
+            selectVis = "time series";
 
         var panel = Panel({
             container: container,
@@ -30,7 +37,9 @@ define( ['vui/panel', 'vui/dropdown', 'js/mmts'], function(Panel, DropDownMenu, 
             selected: 0,
             label: "Visualization",
             // float: "right"
-        });
+        }).onchange = function(vis) {
+            selectVis = vis;
+        };
 
         menu.entity = DropDownMenu({
             container: panel.header,
@@ -103,7 +112,7 @@ define( ['vui/panel', 'vui/dropdown', 'js/mmts'], function(Panel, DropDownMenu, 
             // console.log(stats);
             stats.timestamp = {max: ts[ts.length-1], min: ts[0]};
 
-            plot = mmtsPlot({
+            plot = visualizations[selectVis]({
                 data: data[entity][granularity],
                 stats: stats,
                 width: width,
@@ -134,9 +143,6 @@ define( ['vui/panel', 'vui/dropdown', 'js/mmts'], function(Panel, DropDownMenu, 
         widget.attribute = function() {
             return attributes[selectedAttribute];
         }
-
-
-
 
         widget.clear = panel.clear;
         widget.menu = menu;

@@ -168,7 +168,7 @@ function glHeatmap(arg){
 
         y = svg.axis({
             dim: "y",
-            domain: [0, 2550],
+            domain: [0, heatmap.data['rank'][heatmap.data['rank'].length-1]],
             align: "left",
             // scale: heatmap.scale,
             exponent: heatmap.exponent,
@@ -267,6 +267,9 @@ function glHeatmap(arg){
 
         return heatmap;
     }
+
+    heatmap.highlight = function() {};
+
     heatmap.remap();
 
     return heatmap.render(vmap);

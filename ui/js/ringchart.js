@@ -13,13 +13,11 @@ function ringChart(option){
         color = option.color || 120,
         circle = option.circle || false;
 
+    var ring = container.append("g");
     var elements = [], vi;
 
     var stats = {},
         features = Object.keys(vmap).map(function(k){return vmap[k];});
-
-    var ring = container.append("g");
-
 
     for(var f in dataRange) {
         stats[f] = {min: dataRange[f].min, max: dataRange[f].max};
@@ -30,7 +28,6 @@ function ringChart(option){
 
     // stats = p4.stats(data, features);
     // features.forEach(function(f){
-    //     // stats[f] = {min: dataRange[f].min, max: dataRange[f].max};
     //     if(stats[f].max == stats[f].min) stats[f].max += 0.0001;
     //     stats[f].slope = 1 / (stats[f].max - stats[f].min);
     //     stats[f].const = -1 / (stats[f].max - stats[f].min);

@@ -30,9 +30,17 @@ function dragonflyLink(arg){
 
     for(var f in dataRange) {
         stats[f] = {min: dataRange[f].min, max: dataRange[f].max};
+        if(stats[f].max == stats[f].min) stats[f].max += 0.0001;
         stats[f].slope = 1 / (stats[f].max - stats[f].min);
         stats[f].const = -1 / (stats[f].max - stats[f].min);
     }
+    //
+    // stats = p4.stats(data, features);
+    // features.forEach(function(f){
+    //     if(stats[f].max == stats[f].min) stats[f].max += 0.0001;
+    //     stats[f].slope = 1 / (stats[f].max - stats[f].min);
+    //     stats[f].const = -1 / (stats[f].max - stats[f].min);
+    // });
 
     var getSize = function() { return (outerRadius - innerRadius); },
         getColor = function() { return color; },
@@ -99,7 +107,7 @@ function dragonflyLink(arg){
                 var link = ring.append("path")
                     .attr("d", path)
                     .css("fill", "transparent")
-                    .css("stroke-width",  0.5)
+                    .css("stroke-width", 1)
                     .css("stroke","orange")
                     .css("stroke-opacity", c);
 
@@ -107,8 +115,17 @@ function dragonflyLink(arg){
             }
         }
 
+        ring.select = function(selectGroup) {
+            links.forEach(function(link, i){
+                if(selectGroup >= 0 && selectGroup != Math.floor(i/(num_links*num_routers/num_groups)))
+                    link.css("stroke-width", 0);
+                else
+                    link.css("stroke-width", 1);
+            });
+        }
+
         ring.update = function(data, filterRange) {
-            var filter = filterRange || [0, 1]
+            var filter = filterRange || [0, 1];
             links.forEach(function(link, i){
                 var c = data[i][vmap.color] * stats[vmap.color].slope + stats[vmap.color].const;
                 if(c >= filter[0] && c <= filter[1])
@@ -117,7 +134,6 @@ function dragonflyLink(arg){
                     link.css("stroke-opacity", 0);
             })
         }
-
         return ring;
     }
 

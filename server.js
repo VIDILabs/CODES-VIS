@@ -4,7 +4,7 @@ var fs = require('fs'),
     bodyParser = require('body-parser'),
     app = express(),
     server = require('http').Server(app),
-    socketio = require('socket.io')(server);
+    YAML = require('yamljs');
 
 var port = process.env.PORT || 8100,
     host = process.env.HOST || "localhost";
@@ -27,14 +27,28 @@ app.use(bodyParser.urlencoded({extended: true}));
 var ctypes = require("../../p4/src/ctypes/ctypes.js"),
     cstore = require("../../p4/src/ctypes/cstore.js"),
     csv = require("../../p4/src/io/node-dsv.js");
-//
+
+var dataDirPath = "./data"
+function listDataDirectories() {
+    return fs.readdirSync(dataDirPath).filter(function(file) {
+        return fs.statSync(path.join(dataDirPath, file)).isDirectory();
+    });
+}
+
+var dataSets = listDataDirectories().map(function(dir){
+    return YAML.load(path.join(dataDirPath, dir, "data.yaml"));
+});
+
+console.log(dataSets);
+
 var terminalFile = "./data/dragonfly-terminals-nonmin.csv",
     routerFile = "./data/dragonfly-routers-nonmin-full.csv",
     terminalData,
     routerRawData,
     routerData,
     terminalStats,
-    routerStats;
+    routerStats,
+    metadata;
 
 var SAMPLE_RATE,
     STEP_TOTAL,
@@ -238,10 +252,6 @@ function getPortData(){
                 ports[rank*STEP_TOTAL+t] = port;
             }
         }
-        // ports.forEach(function(port){
-        //     // console.log(port);
-        //     portData.addRows(port);
-        // })
     }
      portData.addRows(ports);
 
@@ -518,7 +528,7 @@ app.get('/timerange/:start/:end', function(req, res){
                 names = md.names,
                 col = DataStore[e][g].columns();
 
-            console.log(md.rankTotal, metadata[e].stepTotal, size, names);
+            // console.log(md.rankTotal, metadata[e].stepTotal, size, names);
             for(var i = 0; i<md.rankTotal; i++){
                 result[e][g][i] = {};
                 names.forEach(function(n){
