@@ -24,6 +24,8 @@ function glHeatmap(arg){
     heatmap.stats = option.stats || {};
     heatmap.color = option.color || "orange";
 
+    console.log(heatmap.data);
+
     var x = {}, y = {};
     x.axis = null;
     y.axis = null;
@@ -45,7 +47,10 @@ function glHeatmap(arg){
         container: container,
     });
 
+
     var svgLayers = [];
+
+    var heatmapLegend;
 
     webgl.uniform("vec4", "u_color", [0.25, 0.545, 0.667, 1.0])
     .varying("vec4", "v_color")
@@ -57,13 +62,16 @@ function glHeatmap(arg){
         .uniform("vec2", "u_c0")
         .attribute("float", "x")
         .attribute("float", "r")
-        .attribute("float", "y");
+        .attribute("float", "y")
+        .uniform("float", "maxRank")
+        .uniform("float", "lineWidth");
 
     function vertexShader(){
         $float.g = floor(r / nodePerGroup);
         $float.px = (x * u_slope.x + u_c0.x) * 2.0 - 1.0;
         // $float.py = pow(y * u_slope.y + u_c0.y, u_exponent) * 2.0 - 1.0;
-        $float.py = (r/nodePerGroup) *2.0 - 1.0;
+        // $float.py = (r/nodePerGroup) *2.0 - 1.0;
+        $float.py = (r/maxRank * 1.0 - 0.0) *2.0 - 1.0;
         gl_Position = vec4(px, py, 0.0, 1.0);
 
         $float.col = pow(y * u_slope.y + u_c0.y, u_exponent);// * 2.0 - 1.0;
@@ -75,8 +83,8 @@ function glHeatmap(arg){
         } else {
             v_color = u_color;
         }
-        v_color = vec4( 0.0, 0.0, 1.0, col * 0.85 + 0.15);
-        // v_color = vec4( col, col, col, 1.0);
+        // v_color = vec4( 0.0, 0.0, 1.0, col * 0.85 + 0.15);
+        v_color = vec4( 0.0, 0.0, 1.0, col + 0.05);
         gl_PointSize = 1.0;
 
     }
@@ -131,7 +139,77 @@ function glHeatmap(arg){
 
     heatmap.render = function(){
 
+        //generating the legend;
 
+        console.log(container);
+
+        var legendWidth = width + padding.left + padding.right;
+        var legendHeight = height + padding.top + padding.bottom;
+
+        heatmapLegend = d3.select(container).append('svg').attr('width', legendWidth).attr('height', legendHeight).attr('transform', "translate("+ (legendWidth - 30) +"," + 0 + ")");
+
+        var legendDatArr = [  Math.min.apply(Math, webgl.attribute.y.value) ,
+                             ( Math.max.apply(Math, webgl.attribute.y.value) +  Math.min.apply(Math, webgl.attribute.y.value) ) / 2,
+                              Math.max.apply(Math, webgl.attribute.y.value)
+           ];
+
+        for(var i = 0; i < legendDatArr.length; i++){
+          if(legendDatArr[i] < 10)
+            legendDatArr[i] = legendDatArr[i];
+          else if(legendDatArr[i] < 100)
+          {
+            legendDatArr[i] = Math.floor( legendDatArr[i] / 10 ) * 10;
+          }
+          else if(legendDatArr[i] < 1000)
+          {
+            legendDatArr[i] = Math.floor( legendDatArr[i] / 100 ) * 100;
+          }
+          else if(legendDatArr[i] < 10000)
+          {
+            legendDatArr[i] = Math.floor( legendDatArr[i] / 1000 ) * 1000;
+          }
+        }
+
+
+        heatmapLegend.selectAll(".heatmaplegendrect").data(legendDatArr).enter().append('rect')
+                      .attr('x', function(d,i){
+                        return legendWidth - 40 + 0;
+                      })
+                      .attr('y', function(d,i){
+                        var y = i % 3;
+                        // return y * legendHeight/3;
+                        return y * 15;
+                      })
+                      .attr('width', 5)
+                      .attr('height', 15)
+                      .style('fill', function(d,i){
+                        return d3.rgb(0.0, 0.0, 255.0).toString();
+                      })
+                      .style('fill-opacity', function(d,i){
+                        var a = d / Math.max.apply(Math, webgl.attribute.y.value);
+                        console.log(a);
+                        return a + 0.05;
+                      });
+
+        heatmapLegend.selectAll(".heatmaplegendtext").data(legendDatArr).enter().append('text')
+                      .attr('x', function(d,i){
+                        return legendWidth - 55 + 20;
+                      })
+                      .attr('y', function(d,i){
+                        var y = i % 3;
+                        // return y * legendHeight/3 + (legendHeight/3)/2;
+                        return y * 15 + (15)/2;
+                      })
+                      .text(function(d,i){
+                        return ">= " + formatY(d);
+                      });
+
+        heatmapLegend.selectAll('text').attr("font-size", "9px")
+
+
+
+        console.log("max of value is: ", Math.max.apply(Math, webgl.attribute.y.value) );
+        console.log("min of value is: ", Math.min.apply(Math, webgl.attribute.y.value) );
 
         gl.clearColor(1.0,1.0,1.0,1.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
@@ -143,7 +221,13 @@ function glHeatmap(arg){
 
         console.log("the linewidth is: ", lineWidth);
 
+
+        console.log("max of rank is: ", Math.max.apply(Math, webgl.attribute.r.value) );
+        webgl.uniform["maxRank"] = Math.max.apply(Math, webgl.attribute.r.value);
+
         gl.lineWidth(lineWidth);
+
+        webgl.uniform.lineWidth = lineWidth;
 
         var a = alpha,
             steps = heatmap.data[vmap.y].length;
