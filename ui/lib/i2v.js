@@ -4878,14 +4878,14 @@ module.exports = (function(){
             for(var key in this._super){
                 if(!this.hasOwnProperty(key)){
                     this[key] = this._super[key];
+                    if(key[0] == "$") $protected[this.objId][key] = this._super[key];
                 }
-                if(key[0] == "$") $protected[this.objId][key] = this._super[key];
             }
 
             classFunction.call(this, option);
 
             for(var key in this){
-                if(key[0] == "$") $protected[this.objId][key] = this[key];
+                if(!this.hasOwnProperty(key) && key[0] == "$" ) $protected[this.objId][key] = this[key];
             }
 
             //prevent accessing protected variables from outside
@@ -5403,7 +5403,8 @@ module.exports = function Svg(arg){
             // margin = option.margin || {left: 0, right: 0, top: 0, bottom: 0},
             dim         = option.dim || "x",
             labelPos    = option.labelPos || option.labelPosition || {x: 0, y: 0},
-            labelAngel  = option.labelAngel || 0,
+            labelAngle  = option.labelAngle || 0,
+            labelSize   = option.labelSize || '0.8em',
             ticks       = option.ticks || 5,
             tickLength  = option.tickLength || 6,
             tickPosition = option.tickPosition || 0,
@@ -5449,17 +5450,29 @@ module.exports = function Svg(arg){
         domain[1] = intv * Math.ceil(domain[1]/intv);
 
         function domainIntervals() {
-            var di = [];
-            for(var i = domain[0]; i < domain[1]; i=i+intv)
-                di.push(i);
+            if(scale == "ordinal" || scale == "categorical") {
+               return domain;
+            } else {
+                var di = [];
+                for(var i = domain[0]; i < domain[1]; i=i+intv)
+                    di.push(i);
 
-            return di;
+                return di;
+            }
         }
 
         if (metric === null) {
             if(scale == "power") {
                 metric = d3s.scalePow().exponent(exponent).domain(domain).range(range);
                 metric.value = metric;
+            } else if(scale == "ordinal" || scale == "categorical") {
+                metric = d3s.scaleOrdinal().domain(domain).range(range);
+                metric.value = function(v) {
+                    var step = (range[1] - range[0]) / (domain.length),
+                        i = domain.indexOf(v);
+                    return (i+0.5) * step;
+                };
+
             } else {
                 // metric = new Metric().scale(scale).domain(domain).range(range);
                 metric = d3s.scaleLinear().domain(domain).range(range);
@@ -5518,10 +5531,10 @@ module.exports = function Svg(arg){
                         x: x2 + labelPos.x,
                         y: y2 - labelPos.y,
                         class: "labels",
-                        "font-size": ".9em",
+                        "font-size": labelSize,
                         "text-anchor": "middle"
                     });
-                if(labelAngel) tickLabel.attr("transform", "rotate(" + [labelAngel, (x2 + labelPos.x), (y2 - labelPos.y)].join(",")+")");
+                if(labelAngle) tickLabel.attr("transform", "rotate(" + [labelAngle, (x2 + labelPos.x), (y2 - labelPos.y)].join(",")+")");
 
                 var labelText = (typeof(tickFormat) == "function") ? format(tickFormat(di[i])) : format(di[i]) ;
                 tickLabel.appendChild( document.createTextNode(labelText) );

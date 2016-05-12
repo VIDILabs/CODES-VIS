@@ -26,12 +26,12 @@ function ringChart(option){
         stats[f].const = -1 / (stats[f].max - stats[f].min);
     }
 
-    // stats = p4.stats(data, features);
-    // features.forEach(function(f){
-    //     if(stats[f].max == stats[f].min) stats[f].max += 0.0001;
-    //     stats[f].slope = 1 / (stats[f].max - stats[f].min);
-    //     stats[f].const = -1 / (stats[f].max - stats[f].min);
-    // });
+    stats = p4.stats(data, features);
+    features.forEach(function(f){
+        if(stats[f].max == stats[f].min) stats[f].max += 0.0001;
+        stats[f].slope = 1 / (stats[f].max - stats[f].min);
+        stats[f].const = -1 / (stats[f].max - stats[f].min);
+    });
     // console.log(vmap, stats);
     function coord(r, rad){
         var x = width/2 + r * Math.cos(rad),
@@ -48,12 +48,10 @@ function ringChart(option){
     }
 
     if("color" in vmap) {
-        getColor =  function(d){
-            var value = 120 - (d * stats[vmap.color].slope + stats[vmap.color].const) * 120;
-
-            if(value < 0) value = -value;
-            if(value > 360) value = Math.abs(color);
-            return  "hsl("+(Math.floor(value))+", 100%, 38%)";
+        getColor =  function(value){
+            var colorScale = d3.scale.linear().domain([stats[vmap.color].min, stats[vmap.color].max]).range([120, 0]);
+            if(colorScale(value) > 120 ||colorScale(value)  < 0) console.log(value);
+            return  "hsl("+colorScale(value)+", 100%, 38%)";
         };
     }
 

@@ -9,6 +9,7 @@ function dragonflyLink(arg){
         vmap = option.vmap || {},
         container = option.container || null,
         radius = option.radius || width/2,
+        color = option.color || 'orange',
         dataRange = option.dataRange || {min: 0, max: 1};
 
     var num_routers = arg.numRouter || 510,
@@ -66,7 +67,10 @@ function dragonflyLink(arg){
         var start = 0,
             router_per_group = num_routers/ num_groups,
             n= num_routers,
-            r = i2v.Metric().domain([n, 0]).range([0,radius*0.9]);
+            r = d3.scale.linear().domain([n, n/2, 0]).range([radius*0.9, 0, radius*0.9]),
+            colorScale = d3.scale.ordinal().range(["#fed976","#feb24c","#fd8d3c","#fc4e2a","#e31a1c","#bd0026","#800026"]);
+            // alphaScale = d3.scale.linear().domain([stats[vmap.color].min, stats[vmap.color].max]);
+
 
         for(var i = 0; i<num_routers; i++){
             var router_id = i,
@@ -93,25 +97,25 @@ function dragonflyLink(arg){
 
                 var c = data[i*num_links + j][vmap.color] * stats[vmap.color].slope + stats[vmap.color].const;
 
-                var diff = (target_pos - i)  / 2,
-                    cp;
+                var diff = (target_pos - i);
+                var ca = (i+diff/2) / n * 2 * Math.PI;
+                if(Math.abs(diff) >= n/2) { ca -= Math.PI; }
 
-                var ca = (i+diff) / n * 2 * Math.PI;
-                if(diff >= n/4) { ca += Math.PI; diff = diff+n/2; }
-                if(diff<0) diff += n;
-
-                var cp = coord(Math.pow(r((diff*2)%n),0.9), ca);
-
+                var cp = coord(r(Math.abs(diff)), ca);
                 var path = ["M", src.x, src.y, "Q", cp.x, cp.y, dest.x, dest.y].join(' ');
+
 
                 var link = ring.append("path")
                     .attr("d", path)
                     .css("fill", "transparent")
                     .css("stroke-width", 1)
-                    .css("stroke","orange")
+                    // .css("stroke", colorScale(c));
+                    .css("stroke", color)
                     .css("stroke-opacity", c);
 
                 links.push(link);
+
+
             }
         }
 
@@ -124,8 +128,9 @@ function dragonflyLink(arg){
             });
         }
 
-        ring.update = function(data, filterRange) {
+        ring.update = function(newData, filterRange) {
             var filter = filterRange || [0, 1];
+            if(typeof(newData) != 'undefined' && newData.length) data = newData;
             links.forEach(function(link, i){
                 var c = data[i][vmap.color] * stats[vmap.color].slope + stats[vmap.color].const;
                 if(c >= filter[0] && c <= filter[1])

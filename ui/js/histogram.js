@@ -9,177 +9,127 @@ function histogram(option){
         container = option.container || null,
         position = option.position || {x: 0, y:0},
         dataRange = option.dataRange || {min: 0, max: 1},
-        color = option.color || 120,
-        circle = option.circle || false,
-        margin = option.margin || {left: 30, right: 30, top: 30, bottom: 20};
+        color = option.color || "#179380",
+        alpha = 1,
+        margin = option.margin || {left: 70, right: 10, top: 10, bottom: 40},
+        formatX = option.formatX || function(d) { return d; },
+        formatY = option.formatY || function(d) { return d; },
+        transform = option.transform;
 
     width -= margin.left + margin.right;
     height -= margin.top + margin.bottom;
-    var barWidth =  width /data.length;
-    var histogram = container.append("g"),
+    var svg = i2v.Svg({width: width, height: height, container: container, padding: margin});
+    svg.style.position = 'relative';
+
+    var histogram = svg.append("g"),
         bar = histogram.append("g"),
-        stats = {},
-        features = Object.keys(vmap).map(function(k){return vmap[k];});
-        stats = p4.stats(data,features);
+        rects = [],
+        xAxis,
+        yAxis,
+        features = Object.keys(vmap).map(function(k){return vmap[k];}),
+        stats;
 
-    bar.translate(margin.left, margin.top);
-
-    for(var f in dataRange) {
-        stats[f] = {min: dataRange[f].min, max: dataRange[f].max};
-
-        stats[f].slope = 1 / (stats[f].max - stats[f].min);
-        stats[f].const = -1 / (stats[f].max - stats[f].min);
-    }
+    // for(var f in dataRange) {
+    //     stats[f] = {min: dataRange[f].min, max: dataRange[f].max};
+    //     stats[f].slope = 1 / (stats[f].max - stats[f].min);
+    //     stats[f].const = -1 / (stats[f].max - stats[f].min);
+    // }
 
     var getSize = function() { return height; },
-        getColor = function() { return color; };
+        getAlpha = function() { return alpha; };
 
-    if("size" in vmap) {
-        getSize = i2v.Metric({
-            domain: [stats[vmap.size].min,
-            stats[vmap.size].max],
-            range: [0 , outerRadius-innerRadius]
-        });
-    }
-
-    if("color" in vmap) {
-        getColor =  function(d){
-            var value = color - (d * stats[vmap.color].slope + stats[vmap.color].const) * 120;
-            if(value < 0) value = -value;
-            if(value - color > 120) value = color;
-            return  "hsl("+(Math.floor(value))+", 100%, 50%)";
-        };
-    }
-
-    console.log(data);
-
-    data.forEach(function(d){
-        if(option.granu == "router")
-            d.group_id = Math.floor(d.rank / 10);
-        else if(option.granu == "node")
-            d.group_id = Math.floor(d.rank / 51);
-    });
-
-    var sorted = data.map(function(d){return d[vmap.color];}).sort(function(a, b){return b - a;});
-
-    var nodes = [];
-    var query = {$by: "group_id"};
-        query[vmap.color] = "$addToArray";
-    var groupSorted = new p4.pipeline(data).group(query);
-
-
-    groupSorted.result().map(function(d){
-        nodes = nodes.concat( d[vmap.color].sort(function(a,b) { return b-a;} ));
-    });
-
-    console.log(groupSorted.result());
-
-    // console.log(data);
-
-    histogram.init = function() {
-        var len = data.length;
-        console.log(len, barWidth, position.y);
-
-        for(var i = 0; i < len; i++) {
-
-            if(len < 52) {
-                var rect = bar.append("rect")
-                    .attr("x", i * barWidth)
-                    .attr("y",  position.y)
-                    .attr("width", barWidth)
-                    .attr("height", height)
-                    .css("fill", getColor(data[i][vmap.color]));
-            } else {
-                var rect = bar.append("rect")
-                    .attr("x", i * barWidth)
-                    .attr("y",  position.y)
-                    .attr("width", barWidth)
-                    .attr("height", height)
-                    .attr("fill", getColor(nodes[i]));
-            }
-
-                // .attr("stroke-width", 0.5)
-                // .attr("stroke", "#777")
-                // .attr("fill", getColor(nodes[i]));
-                // .css("fill", getColor(sorted[i]));
-                // .css("fill", getColor(data[i][vmap.color]));
-
-            rect.onmouseover = function(evt) {
-                this.attr("stroke", "#000")
-                    .attr("stroke-width", 0.5);
-            }
-
-            rect.onmouseout = function(evt) {
-                this.css("stroke-width", 0);
-            }
-
+    function updateVMFunction(stats){
+        if("size" in vmap) {
+            getSize = i2v.Metric({
+                domain: [0, stats[vmap.size].max],
+                range: [0 , height]
+            });
         }
 
-        bar.append("text")
-            .attr("y", position.y+height+20)
-            .attr("x", width)
-            .attr("dy", ".91em")
-            .css("font-size", "20px")
-            .css("text-anchor", "end")
-            .text("max: " + p4.io.printformat(".2s")(stats[vmap.color].max));
+        if("alpha" in vmap) {
+            getAlpha =  function(d){
+                return d * stats[vmap.color].slope + stats[vmap.color].const;
+            };
+        }
+    }
+
+    histogram.init = function() {
+
+        data = transform(data, features);
+        stats = p4.stats(data,features);
+
+        updateVMFunction(stats);
+
+        var len = data.length,
+            barWidth =  width / len;
+
+        var labelSize = (len > 30 ) ? '0.7em' : '0.9em';
+        var labelAngle = (len > 50 ) ? -45 : 0;
+
+        var x = svg.axis({
+            dim: "x",
+            scale: 'ordinal',
+            domain: p4.arrays.seq(0, len-1),
+            align: "bottom",
+            labelSize: labelSize,
+            labelAngle: labelAngle,
+            // ticks: 8,
+            // tickInterval: 10000000,
+            labelPos: {x: 0, y: -20},
+            format: formatX
+        });
+
+        var y = svg.axis({
+            dim: "y",
+            domain: [0, stats[vmap.size].max],
+            align: "left",
+            // scale: mmts.scale,
+            labelPos: {x: -20, y: -5},
+            ticks: 7,
+            format: formatY
+        });
+
+        svg.appendChild(xAxis = x.show());
+        svg.appendChild(yAxis = y.show());
+        if(stats[vmap.size].max===0) return;
+        for(var i = 0; i < len; i++) {
+            var rect = bar.append("rect")
+                .attr("x", (i + 0.1) * barWidth)
+                .attr("y",  height - getSize(data[i][vmap.size]))
+                .attr("width", barWidth*0.8)
+                .attr("height", getSize(data[i][vmap.size]))
+                .attr("fill", color);
+            rects.push(rect);
+        }
 
 
-        bar.append("text")
-            .attr("y", position.y+height+20)
-            .attr("x", width-150)
-            .attr("dy", ".91em")
-            .css("font-size", "20px")
-            .css("text-anchor", "end")
-            .text("min: " + p4.io.printformat(".2s")(stats[vmap.color].min));
 
-        bar.append("text")
-            .attr("y", position.y+height+20)
-            .attr("x", 0)
-            .attr("dy", ".91em")
-            .css("font-size", "20px")
-            .css("text-anchor", "center")
-            .text( option.granu + " : " + entity + " : " + vmap.color);
-
-        // var grad = histogram.append("defs")
-        //     .append("linearGradient")
-        //     .attr("id", "gradryg")
-        //     .attr("x1", "0%")
-        //     .attr("x2", "100%")
-        //     .attr("y1", "0%")
-        //     .attr("y2", "0%");
-        // //
-        // grad.append("stop")
-        //     .attr("offset", "0%" )
-        //     .attr("stop-color", "rgb(255,255,0)");
-        // grad.append("stop")
-        //     .attr("offset", "50%" )
-        //     .attr("stop-color", "rgb(255,0,0)");
-        //
-        //
-        // bar.append("rect")
-        //         .attr("x", width-140)
-        //         .attr("y", position.y+height+20)
-        //         .attr("width", 130)
-        //         .attr("height", height)
-        //         .attr("fill", "url(#gradryg)");
-
-        // var groupWidth = width / 52;
-        // for(var i = 0; i<51; i++) {
-        //     bar.append("rect")
-        //     .attr("x", i * groupWidth)
-        //     .attr("y",  position.y)
-        //     .attr("width", groupWidth)
-        //     .attr("height", height)
-        //     .css("stroke", "#aaa")
-        //     .css("stroke-width", 0.5)
-        //     .css("fill", "none");
-        // }
-
-        // bar.scale(5.0, 1.0);
-        // bar.translate(10, 0);
-
+        bar.translate(margin.left, margin.top);
         return histogram;
     };
+
+    histogram.update = function(data) {
+        yAxis.remove();
+        data = transform(data, features);
+        stats = p4.stats(data,features);
+        updateVMFunction(stats);
+
+        var y = svg.axis({
+            dim: "y",
+            domain: [0, stats[vmap.size].max],
+            align: "left",
+            // scale: mmts.scale,
+            labelPos: {x: -20, y: -5},
+            ticks: 7,
+            format: formatY
+        });
+        svg.appendChild(yAxis = y.show());
+        for(var i = 0, len = data.length; i < len; i++) {
+            rects[i].attr("y",  height - getSize(data[i][vmap.size]))
+                .attr("height", getSize(data[i][vmap.size]))
+                .attr("fill", color);
+        }
+    }
 
     return histogram.init();
 };

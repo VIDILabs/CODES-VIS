@@ -64,19 +64,21 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
             panels = [];
 
         var viewRight = "Network",
-            networkView;
+            networkView,
+            viewRightWidth = window.innerHeight * 0.65,
+            statCharts = [];
 
         var panelRight = Panel({
             container: 'layout-main',
-            width: 680,
-            height: 680,
+            width: window.innerHeight * 0.65,
+            height: window.innerHeight * 0.65,
             header: true,
         });
 
         var panelLeft = Panel({
             container: 'layout-main',
-            width: 930,
-            height: 650,
+            width: window.innerWidth - 50 - window.innerHeight * 0.65,
+            height: window.innerHeight * 0.65 - 30,
             header: true,
         });
 
@@ -93,8 +95,8 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
         });
 
         panelRight.style.position = "absolute";
-        panelRight.body.style.padding = "20px";
-        panelRight.style.left = "940px";
+        // panelRight.body.style.padding = "20px";
+        panelRight.style.left = window.innerWidth - 40 - window.innerHeight * 0.65 + "px";
         panelRight.top = 0;
         panelRight.style.float = "none";
         // panelRight.title = "Statistical View";
@@ -107,8 +109,7 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
             label: "View",
             float: "left"
         }).onchange = function(d){
-            viewRight = d;
-            topoView.innerHTML = "";
+            networkView.change(d);
         };
 
         p4.io.ajax.get({
@@ -154,14 +155,15 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
 
             // if(numPanel > attributes.length) numPanel = attributes.length;
             for(var i = 0; i < numPanel; i++){
+                var granus = ['group', 'router', 'node'];
                 panels[i] = Widget({
-                    width: 850,
-                    height: 122,
+                    width: window.innerWidth - 130 - window.innerHeight * 0.65,
+                    height: window.innerHeight * 0.2 - 86 ,
                     container: panelLeft.body,
                     attributes: attributes,
-                    selectedAttribute: i,
+                    selectedAttribute: 0,
                     entity: "terminal",
-                    granularity: "group",
+                    granularity: granus[i],
                     onchange: updateVis
                 });
                 panels[i].rank = i;
@@ -170,9 +172,9 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
 
             var summaryPanel = Panel({
                 container: 'layout-main',
-                width: 1620,
+                width: window.innerWidth - 40,
                 // width: 920,
-                height: 200,
+                height: window.innerHeight * 0.2,
                 header: true,
             });
 
@@ -192,8 +194,8 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
                 var summaryChart = lineChart({
                     stats: stats,
                     brush: true,
-                    width: 1560,
-                    height: 150,
+                    width: window.innerWidth - 100,
+                    height: window.innerHeight * 0.2-50,
                     container: summaryPanel.body,
                     timestamps: timestamps,
                     series: timeSeries,
@@ -231,14 +233,16 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
             }
 
             var struct = [
-                {entity: "router", level: "router", vmap: {color: "global_busytime"}, circle: false, radius: 160, thick: 10},
-                {entity: "router", level: "router", vmap: {size: "local_traffic", color: "local_busytime"}, circle: false, radius: 180, thick: 50},
+                {entity: "router", level: "router", vmap: {color: "global_busytime"}, circle: false, radius: viewRightWidth/4, thick: 10},
+                {entity: "router", level: "router", vmap: {size: "local_traffic", color: "local_busytime"}, circle: false, radius: viewRightWidth/4+20, thick: 50},
                 // {entity: "terminal", level: "group", vmap: {color: "busy_time (ns)", size: "data_size (Byte)"}, circle: false, radius: 210 + 10*TERMINAL_PER_ROUTER, thick: 40},
-                {entity: "router", level: "group", vmap: {color: "terminal_busytime", size: "terminal_traffic"}, circle: false, radius: 245, thick: 40},
+                {entity: "router", level: "group", vmap: {color: "terminal_busytime", size: "terminal_traffic"}, circle: false, radius: viewRightWidth/4+70, thick: 40},
             ];
 
             showOverview(entity, granularity);
             networkView = circularGraph({
+                width: window.innerHeight * 0.65,
+                height: window.innerHeight * 0.65,
                 stats: meta,
                 container: panelRight.body,
                 stepStart: stepStart,
@@ -246,14 +250,15 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
                 numGroup: NUM_GROUP,
                 numRouter: NUM_ROUTER,
                 numTerminal: NUM_TERMINAL,
+                routerRadix: ROUTER_RADIX,
                 struct: struct,
+                statCharts: statCharts,
                 onhover: function(groupId){
                     panels.forEach(function(panel){
                         panel.highlight(groupId, getRankPerGroup(panel.entity(), panel.granularity()));
                     })
                 }
             });
-
 
             DropDownMenu({
                 container: summaryPanel.header,
@@ -271,31 +276,33 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
             var e = panel.entity(),
                 g = panel.granularity(),
                 a = panel.attribute();
-                ioStart = new Date();
+
             var dataURL = ["/timeseries", stepStart, (stepStart+numStep), e, g].join("/");
 
             var attributes = meta[e][g].names.filter(function(n){
                 return (["timestamp", "rank", "port", "router_id", "group_id", "type"].indexOf(n)===-1);
             })
 
-            panel.changeAttributes(attributes);
+            a = panel.changeAttributes(attributes);
+
+            statCharts[panel.rank] = {
+                entity: e,
+                granularity: g,
+                attribute: attributes[0]
+            };
+
+            if(networkView) networkView.updateHistogram(panel.rank, e, g, a);
 
             function _update(data) {
-                // var stats = p4.ctypes.query.stats(data, attributes);
-                // console.log(stats);
                 panel.clear();
                 panel.visualize({
                     data: data,
-                    stats: stats,
+                    // stats: stats,
                     steps: ts.length,
                     ts: ts,
-                    // vmap: {x: "timestamp", y: attributes[0]},
-                    // color: tsColor(attributes[0]),
-                    // aggregation: binAggregatedData,
                     formatX: function(d) { return p4.io.printformat(".2s")(d / 1000000) + "ms"; },
                     formatY: p4.io.printformat(".2s")
                 });
-
             }
 
             if(temporalData[e][g] === null) {
@@ -316,12 +323,11 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
 
                     temporalData[e][g] = data;
                     _update(temporalData);
-                    // console.log( "### Performance Test (IO Latency):", new Date() - ioStart, numStep, panel.rank);
+
                 });
             } else {
                 _update(temporalData);
             }
         }
-
     }
 });

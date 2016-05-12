@@ -41,8 +41,8 @@ var dataSets = listDataDirectories().map(function(dir){
 
 console.log(dataSets);
 
-var terminalFile = "./data/dragonfly-terminals-nonmin.csv",
-    routerFile = "./data/dragonfly-routers-nonmin-full.csv",
+var terminalFile = "./data/dragonfly-terminals-adaptive.csv",
+    routerFile = "./data/dragonfly-routers-adaptive-full.csv",
     terminalData,
     routerRawData,
     routerData,

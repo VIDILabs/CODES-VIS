@@ -30,7 +30,7 @@ function mmtsPlot(arg){
     x.axis = null;
     y.axis = null;
     // console.log(stats);
-    width -= padding.right;
+    // width -= padding.left+padding.right;
     // height -= padding.bottom;
 
     var webgl = i2v.WebGL({
@@ -106,9 +106,7 @@ function mmtsPlot(arg){
         webgl.attribute.y = new Float32Array(mmts.data[vmap.y]);
 
         svg.clear();
-
-        console.log(mmts.data);
-
+        // console.log(mmts.data);
     }
     svg.clear = function(){
         svgLayers.forEach(function(layer){
@@ -190,10 +188,8 @@ function mmtsPlot(arg){
             ticks: 7,
             format: formatY
         });
-
         svg.addLayer(x.show());
         svg.addLayer(y.show());
-
         return mmts;
     }
     mmts.remap();

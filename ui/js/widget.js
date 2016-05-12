@@ -33,12 +33,13 @@ define(deps, function(Panel, DropDownMenu, mmtsPlot, glHeatmap){
 
         menu.vis = DropDownMenu({
             container: panel.header,
-            options: ["time series", "time histogram", "heatmap"],
+            options: ["time series", "heatmap"],
             selected: 0,
             label: "Visualization",
             // float: "right"
         }).onchange = function(vis) {
             selectVis = vis;
+            onchange(widget);
         };
 
         menu.entity = DropDownMenu({
@@ -56,7 +57,7 @@ define(deps, function(Panel, DropDownMenu, mmtsPlot, glHeatmap){
         menu.granularity = DropDownMenu({
             container: panel.header,
             options: [ "group", "router", "node/port"],
-            selected: 0,
+            selected: [ "group", "router", "node"].indexOf(granularity),
             label: "Granularity",
             float: "right"
         })
@@ -74,10 +75,10 @@ define(deps, function(Panel, DropDownMenu, mmtsPlot, glHeatmap){
         });
 
         menu.attribute.onchange = function(d){
-            // console.log(d);
             selectedAttribute = attributes.indexOf(d);
-            plot.remap({ x: "timestamp", y: d});
-            plot.render();
+            // plot.remap({ x: "timestamp", y: d});
+            // plot.render();
+            onchange(widget);
         };
         // menu.vis = DropDownMenu({
         //     container: panel.header,
@@ -98,6 +99,8 @@ define(deps, function(Panel, DropDownMenu, mmtsPlot, glHeatmap){
             } else {
                 menu.attribute.changeOptions(attr);
             }
+
+            return attributes[selectedAttribute];
         };
 
         widget.visualize = function(arg){
