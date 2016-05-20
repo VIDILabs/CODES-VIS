@@ -194,12 +194,12 @@ function mmtsPlot(arg){
             .css("font-size", ".9em")
             .text(formatY(min));
 
-            legend.append("text")
-                .attr("x", legendPos)
-                .attr("y", 0.5*height+35)
-                .css("fill", "#222")
-                .css("font-size", ".9em")
-                .text(formatY(max));
+        legend.append("text")
+            .attr("x", legendPos)
+            .attr("y", 0.5*height+35)
+            .css("fill", "#222")
+            .css("font-size", ".9em")
+            .text(formatY(max));
 
 
         statsLines.translate(padding.left, padding.top);

@@ -38,8 +38,17 @@ canvas {
     /*position: relative;*/
 }
 
-#topology-view {
+#data-preview {
+    position: fixed;
+    bottom: 0;
+}
 
+.table-striped > tbody > tr{
+    cursor: pointer;
+}
+
+.table-striped > tbody > tr:hover {
+    background-color: #e7fafa;
 }
 
 .navbar-nav li.active {
@@ -47,6 +56,13 @@ canvas {
     background-color: #e7e7e7;
 }
 
+.config {
+    height: 200px;
+}
+
+.ui-state-default {
+    margin: 20px;
+}
 /*.navbar-nav li a {
     color: #222;
     font-weight: bold;
@@ -65,8 +81,12 @@ canvas {
     background-repeat: no-repeat;
 }
 
+.popover {
+    max-width: 45%;
+}
+
 .nav-icon-coa {
-    background-image: url("/style/img/nav-icon2.png");
+    background-image: url("/style/img/corr-icon.png");
     background-position: left center;
     width: 32px;
     margin: 10px;

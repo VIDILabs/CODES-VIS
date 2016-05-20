@@ -111,12 +111,12 @@ define(deps, function(Panel, DropDownMenu, mmtsPlot, glHeatmap){
 
             var alpha = {group: 0.5, router: 0.25, node: 0.1};
             // console.log(attributes);
-            var stats = p4.ctypes.query.stats(data[entity][granularity], attributes);
+            var stats = p4.ctypes.query.stats(data, attributes);
             // console.log(stats);
             stats.timestamp = {max: ts[ts.length-1], min: ts[0]};
 
             plot = visualizations[selectVis]({
-                data: data[entity][granularity],
+                data: data,
                 stats: stats,
                 width: width,
                 height: height,

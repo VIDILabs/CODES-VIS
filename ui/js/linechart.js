@@ -223,10 +223,9 @@ function lineChart(arg){
       .append("text")
         .attr("transform", "rotate(-90)")
         .attr("y", 20)
-        .attr("x", -50)
+        .attr("x", -height/3)
         .attr("dy", ".71em")
         .css("text-anchor", "end")
-        .css("font-weight", "bold")
         .text("Normalized Mean");
 
     Object.keys(series).forEach(function(si,j){

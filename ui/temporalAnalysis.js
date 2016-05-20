@@ -1,14 +1,15 @@
 var dependencies = [
     'vui/panel',
     'vui/dropdown',
+    'model',
     'js/widget',
     'js/linechart',
     'views/network-dragonfly'
 ];
 
-define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGraph) {
+define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, circularGraph) {
     'use strict';
-    return function main(){
+    return function main(datasetID, layoutID){
         var SAMPLE_RATE,
             STEP_TOTAL,
             NUM_GROUP,
@@ -69,30 +70,34 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
             statCharts = [];
 
         var panelRight = Panel({
-            container: 'layout-main',
+            container: layoutID,
             width: window.innerHeight * 0.65,
             height: window.innerHeight * 0.65,
             header: true,
+            info: { content: "This panel shows newtork view or statstical view.", float: "left", placement: "left"},
+            loadIndicator: "/style/img/loading-indicator.gif"
         });
 
         var panelLeft = Panel({
-            container: 'layout-main',
+            container: layoutID,
             width: window.innerWidth - 50 - window.innerHeight * 0.65,
             height: window.innerHeight * 0.65 - 30,
             header: true,
         });
 
         panelLeft.body.style.padding = "10px";
+        panelLeft.title = "Time Range View";
         panelRight.header.style.position = "absolute";
         panelRight.header.style.zIndex = "999999";
 
-        var selectViewLeft = DropDownMenu({
-            container: panelLeft.header,
-            options: ["Range", "Correlation"],
-            selected: 0,
-            label: "View",
-            float: "left"
-        });
+
+        // var selectViewLeft = DropDownMenu({
+        //     container: panelLeft.header,
+        //     options: ["Range", "Correlation"],
+        //     selected: 0,
+        //     label: "View",
+        //     float: "left"
+        // });
 
         panelRight.style.position = "absolute";
         // panelRight.body.style.padding = "20px";
@@ -112,10 +117,20 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
             networkView.change(d);
         };
 
+        var database, binaryData;
+
         p4.io.ajax.get({
-           url: "/metadata",
-           dataType: "json"
+            url: "/data/" + datasetID,
+            dataType: "arraybuffer"
+        }).then(function(binary){
+            binaryData = binary
+            return p4.io.ajax.get({
+                url: "/metadata/" + datasetID,
+                dataType: "json"
+            })
         }).then(function(md){
+            md.datasetID = datasetID;
+            database = Model({metadata: md, data: binaryData});
             console.log(md);
             meta = md;
             NUM_GROUP = md.numGroup;
@@ -130,12 +145,7 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
 
             metadata = md[entity][granularity];
 
-            return p4.io.ajax.get({
-                url: "/timestats",
-                dataType: "json"
-            });
-        }).then(function(json){
-            timeStats = json;
+            timeStats = md.timeStats;
             timestamps = [];
             for(var i = 0; i<STEP_TOTAL; i++){
                 timestamps.push( (i+1)*SAMPLE_RATE );
@@ -171,11 +181,12 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
             }
 
             var summaryPanel = Panel({
-                container: 'layout-main',
+                container: layoutID,
                 width: window.innerWidth - 40,
                 // width: 920,
                 height: window.innerHeight * 0.2,
                 header: true,
+                loadIndicator: "/style/img/loading-indicator.gif",
             });
 
             function showOverview(entity, granularity) {
@@ -218,13 +229,16 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
                     for(var i = 0; i < rankTotal; i++){
                         ranks.push(i);
                     }
-                    temporalData = {
-                        terminal: {group: null,router: null,node: null},
-                        router: {group: null,router: null,node: null}
-                    };
+                    // temporalData = {
+                    //     terminal: {group: null,router: null,node: null},
+                    //     router: {group: null,router: null,node: null}
+                    // };
 
                     if(viewRight == "Network") {
-                        networkView.update(stepStart, numStep);
+                        database.aggregateByTimeRange(stepStart, (stepStart+numStep), function(result){
+                            networkView.update(result);
+                        })
+
                     }
                     panels.forEach(function(p, i){
                         updateVis(p);
@@ -235,30 +249,34 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
             var struct = [
                 {entity: "router", level: "router", vmap: {color: "global_busytime"}, circle: false, radius: viewRightWidth/4, thick: 10},
                 {entity: "router", level: "router", vmap: {size: "local_traffic", color: "local_busytime"}, circle: false, radius: viewRightWidth/4+20, thick: 50},
-                // {entity: "terminal", level: "group", vmap: {color: "busy_time (ns)", size: "data_size (Byte)"}, circle: false, radius: 210 + 10*TERMINAL_PER_ROUTER, thick: 40},
+                // {entity: "terminal", level: "group", vmap: {color: "busy_time", size: "data_size (Byte)"}, circle: false, radius: 210 + 10*TERMINAL_PER_ROUTER, thick: 40},
                 {entity: "router", level: "group", vmap: {color: "terminal_busytime", size: "terminal_traffic"}, circle: false, radius: viewRightWidth/4+70, thick: 40},
             ];
 
             showOverview(entity, granularity);
-            networkView = circularGraph({
-                width: window.innerHeight * 0.65,
-                height: window.innerHeight * 0.65,
-                stats: meta,
-                container: panelRight.body,
-                stepStart: stepStart,
-                numStep: numStep,
-                numGroup: NUM_GROUP,
-                numRouter: NUM_ROUTER,
-                numTerminal: NUM_TERMINAL,
-                routerRadix: ROUTER_RADIX,
-                struct: struct,
-                statCharts: statCharts,
-                onhover: function(groupId){
-                    panels.forEach(function(panel){
-                        panel.highlight(groupId, getRankPerGroup(panel.entity(), panel.granularity()));
-                    })
-                }
-            });
+
+            database.aggregateByTimeRange(stepStart, (stepStart+numStep), function(result){
+                networkView = circularGraph({
+                    width: window.innerHeight * 0.65,
+                    height: window.innerHeight * 0.65,
+                    stats: meta,
+                    container: panelRight.body,
+                    stepStart: stepStart,
+                    numStep: numStep,
+                    numGroup: NUM_GROUP,
+                    numRouter: NUM_ROUTER,
+                    numTerminal: NUM_TERMINAL,
+                    routerRadix: ROUTER_RADIX,
+                    struct: struct,
+                    data: result,
+                    statCharts: statCharts,
+                    onhover: function(groupId){
+                        panels.forEach(function(panel){
+                            panel.highlight(groupId, getRankPerGroup(panel.entity(), panel.granularity()));
+                        })
+                    }
+                });
+            }),
 
             DropDownMenu({
                 container: summaryPanel.header,
@@ -277,8 +295,6 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
                 g = panel.granularity(),
                 a = panel.attribute();
 
-            var dataURL = ["/timeseries", stepStart, (stepStart+numStep), e, g].join("/");
-
             var attributes = meta[e][g].names.filter(function(n){
                 return (["timestamp", "rank", "port", "router_id", "group_id", "type"].indexOf(n)===-1);
             })
@@ -291,43 +307,51 @@ define(dependencies, function(Panel, DropDownMenu, Widget, linechart, circularGr
                 attribute: attributes[0]
             };
 
-            if(networkView) networkView.updateHistogram(panel.rank, e, g, a);
+            if(networkView) networkView.updateHistogram(panel.rank, e, g, a);6
 
-            function _update(data) {
-                panel.clear();
-                panel.visualize({
-                    data: data,
-                    // stats: stats,
-                    steps: ts.length,
-                    ts: ts,
-                    formatX: function(d) { return p4.io.printformat(".2s")(d / 1000000) + "ms"; },
-                    formatY: p4.io.printformat(".2s")
-                });
-            }
-
-            if(temporalData[e][g] === null) {
-                p4.io.ajax.get({
-                    url: dataURL,
-                    dataType: "arraybuffer"
-                }).then(function(binary){
-                    var size = meta[e][g].rankTotal * (numStep+1),
-                        offset = 0,
-                        types = meta[e][g].types,
-                        names = meta[e][g].names,
-                        data = {};
-
-                    names.forEach(function(n, i){
-                        data[n] = new ctypes[types[i]](binary.slice(offset, offset+size*ctypes[types[i]].BYTES_PER_ELEMENT));
-                        offset += size * ctypes[types[i]].BYTES_PER_ELEMENT;
+            database.select({
+                entity: e,
+                granularity: g,
+                start: stepStart,
+                end: stepStart+numStep,
+                succeed: function(result) {
+                    // console.log(e, g, temporalData);
+                    panel.clear();
+                    panel.visualize({
+                        data: result,
+                        // stats: stats,
+                        steps: ts.length,
+                        ts: ts,
+                        formatX: function(d) { return p4.io.printformat(".2s")(d / 1000000) + "ms"; },
+                        formatY: p4.io.printformat(".2s")
                     });
 
-                    temporalData[e][g] = data;
-                    _update(temporalData);
+                }
+            });
 
-                });
-            } else {
-                _update(temporalData);
-            }
+            // if(temporalData[e][g] === null) {
+            //     p4.io.ajax.get({
+            //         url: dataURL,
+            //         dataType: "arraybuffer"
+            //     }).then(function(binary){
+            //         var size = meta[e][g].rankTotal * (numStep+1),
+            //             offset = 0,
+            //             types = meta[e][g].types,
+            //             names = meta[e][g].names,
+            //             data = {};
+            //
+            //         names.forEach(function(n, i){
+            //             data[n] = new ctypes[types[i]](binary.slice(offset, offset+size*ctypes[types[i]].BYTES_PER_ELEMENT));
+            //             offset += size * ctypes[types[i]].BYTES_PER_ELEMENT;
+            //         });
+            //
+            //         temporalData[e][g] = data;
+            //         _update(temporalData);
+            //
+            //     });
+            // } else {
+            //     _update(temporalData);
+            // }
         }
     }
 });

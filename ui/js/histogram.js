@@ -14,7 +14,9 @@ function histogram(option){
         margin = option.margin || {left: 70, right: 10, top: 10, bottom: 40},
         formatX = option.formatX || function(d) { return d; },
         formatY = option.formatY || function(d) { return d; },
-        transform = option.transform;
+        transform = option.transform,
+        titleX = option.titleX || null,
+        titleY = option.titleY || null;
 
     width -= margin.left + margin.right;
     height -= margin.top + margin.bottom;
@@ -26,6 +28,8 @@ function histogram(option){
         rects = [],
         xAxis,
         yAxis,
+        xAxisTitle,
+        yAxisTitle,
         features = Object.keys(vmap).map(function(k){return vmap[k];}),
         stats;
 
@@ -53,6 +57,28 @@ function histogram(option){
         }
     }
 
+    function drawAxis(){
+        if(titleX){
+            xAxisTitle = xAxis.append("g")
+              .append("text")
+                .attr("y", height + margin.top + 10)
+                .attr("x", width/2 - margin.left)
+                .attr("dy", ".71em")
+                // .css("text-anchor", "end")
+                .text(titleX);
+        }
+        if(titleY) {
+            yAxisTitle = yAxis.append("g")
+              .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -margin.left + 10)
+                .attr("x", -height/3)
+                .attr("dy", ".71em")
+                .css("text-anchor", "end")
+                .text(titleY);
+        }
+    }
+
     histogram.init = function() {
 
         data = transform(data, features);
@@ -68,7 +94,7 @@ function histogram(option){
 
         var x = svg.axis({
             dim: "x",
-            scale: 'ordinal',
+            scale: "ordinal",
             domain: p4.arrays.seq(0, len-1),
             align: "bottom",
             labelSize: labelSize,
@@ -102,8 +128,7 @@ function histogram(option){
             rects.push(rect);
         }
 
-
-
+        drawAxis();
         bar.translate(margin.left, margin.top);
         return histogram;
     };
@@ -124,11 +149,15 @@ function histogram(option){
             format: formatY
         });
         svg.appendChild(yAxis = y.show());
+        xAxisTitle.remove();
+        drawAxis();
         for(var i = 0, len = data.length; i < len; i++) {
             rects[i].attr("y",  height - getSize(data[i][vmap.size]))
                 .attr("height", getSize(data[i][vmap.size]))
                 .attr("fill", color);
         }
+
+
     }
 
     return histogram.init();

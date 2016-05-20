@@ -16,15 +16,17 @@ function ringChart(option){
     var ring = container.append("g");
     var elements = [], vi;
 
+
+
     var stats = {},
         features = Object.keys(vmap).map(function(k){return vmap[k];});
 
-    for(var f in dataRange) {
-        stats[f] = {min: dataRange[f].min, max: dataRange[f].max};
-        if(stats[f].max == stats[f].min) stats[f].max += 0.0001;
-        stats[f].slope = 1 / (stats[f].max - stats[f].min);
-        stats[f].const = -1 / (stats[f].max - stats[f].min);
-    }
+    // for(var f in dataRange) {
+    //     stats[f] = {min: dataRange[f].min, max: dataRange[f].max};
+    //     if(stats[f].max == stats[f].min) stats[f].max += 0.0001;
+    //     stats[f].slope = 1 / (stats[f].max - stats[f].min);
+    //     stats[f].const = -1 / (stats[f].max - stats[f].min);
+    // }
 
     stats = p4.stats(data, features);
     features.forEach(function(f){
@@ -39,6 +41,10 @@ function ringChart(option){
         return {x: x, y: y};
     }
 
+    data.forEach(function(d){
+        if(d < stats[vmap.color].min) console.log(d);
+    })
+
     var getSize = function() { return (outerRadius - innerRadius); },
         getColor = function() { return color; },
         getIntensity = function() {return 1.0};
@@ -49,9 +55,11 @@ function ringChart(option){
 
     if("color" in vmap) {
         getColor =  function(value){
-            var colorScale = d3.scale.linear().domain([stats[vmap.color].min, stats[vmap.color].max]).range([120, 0]);
-            if(colorScale(value) > 120 ||colorScale(value)  < 0) console.log(value);
-            return  "hsl("+colorScale(value)+", 100%, 38%)";
+            var max = d3.max(data.map(function(d){return d[vmap.color];})),
+                min = d3.min(data.map(function(d){return d[vmap.color];}))
+            if(value > max ) value = max;
+            var colorScale = d3.scale.linear().domain([min, max]).range([120,0]);
+            return 'hsl('+colorScale(value)+', 100%, 40%)';
         };
     }
 

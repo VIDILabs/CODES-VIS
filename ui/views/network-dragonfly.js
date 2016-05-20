@@ -13,6 +13,7 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
             option = arg || {},
             stats = option.stats || {},
             width = option.width || 620,
+            data = option.data || [],
             height = option.height || width,
             margin = option.margin || {left: 20, right: 20, top: 20, bottom: 20},
             radius = option.radius || 100,
@@ -26,8 +27,8 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
             routerRadix = option.routerRadix,
             struct = option.struct,
             statCharts = option.statCharts,
-            onhover = option.onhover,
-            jsonData;
+            onhover = option.onhover;
+
 
         width -= margin.left + margin.right;
         height -= margin.top + margin.bottom;
@@ -61,6 +62,19 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
                 router: numRouter / numGroup,
                 node: routerRadix
             }
+        };
+
+        var xAxisTitles = {
+            terminal:{
+                group: "Group ID",
+                router: "Associated Router ID",
+                node: "Terminal ID in Routers"
+            },
+            router: {
+                group: "Group ID",
+                router: "Router ID in Groups",
+                node: "Port ID in Routers"
+            }
         }
 
         nv.show = function(){svg.style.display = "block";};
@@ -93,13 +107,15 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
                 height: height/3,
                 vmap: {size: s.attribute},
                 transform: transform,
+                titleX: xAxisTitles[s.entity][s.granularity],
+                titleY: s.attribute,
                 formatY: p4.io.printformat(".2s")
             });
 
             return hist;
         }
 
-        function init(data){
+        function init(){
             struct.forEach(function(s){
                 var result = (s.data) ? s.data : data[s.entity][s.level];
                 // console.log(result.length);
@@ -165,57 +181,76 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
                  center: true,
                  minZoom: 0.1
             });
-
             // nv.hide();
-
             statCharts.forEach(function(s, si){
                 histograms[si].vis = makeHistogram(data, s, histograms[si]);
             });
-
         }
 
-        // nv.updateStatChart = function(hid, )
-        nv.update = function(stepStart, numStep){
-            p4.io.ajax.get({
-                url: "/timerange/" + stepStart + "/" + (stepStart+numStep),
-                dataType: "json"
-            }).then(function(data){
-                jsonData = data;
-                struct.forEach(function(s, si){
-                    var result = (s.data) ? s.data : data[s.entity][s.level];
-                    rings[si].update(result);
-                });
 
-                var result = new p4.pipeline(data.router.node)
-                    .match({type: 2}).result();
+        // nv.update = function(stepStart, numStep){
+        //     p4.io.ajax.get({
+        //         url: "/timerange/" + stepStart + "/" + (stepStart+numStep),
+        //         dataType: "json"
+        //     }).then(function(data){
+        //         jsonData = data;
+        //         struct.forEach(function(s, si){
+        //             var result = (s.data) ? s.data : data[s.entity][s.level];
+        //             rings[si].update(result);
+        //         });
+        //
+        //         var result = new p4.pipeline(data.router.node)
+        //             .match({type: 2}).result();
+        //
+        //         links.update(result);
+        //
+        //         statCharts.forEach(function(s, i){
+        //             var histData = data[s.entity][s.granularity],
+        //                 rankMax = ranks[s.entity][s.granularity];
+        //             histData.forEach(function(d){d.mRank = d.rank % rankMax;});
+        //             histograms[i].vis.update(histData);
+        //         });
+        //     });
+        // }
 
-                links.update(result);
+        nv.update = function(newData){
 
-                statCharts.forEach(function(s, i){
-                    var histData = data[s.entity][s.granularity],
-                        rankMax = ranks[s.entity][s.granularity];
-                    histData.forEach(function(d){d.mRank = d.rank % rankMax;});
-                    histograms[i].vis.update(histData);
-                });
+            data = newData;
+            struct.forEach(function(s, si){
+                var result = (s.data) ? s.data : data[s.entity][s.level];
+                rings[si].update(result);
             });
+
+            var result = new p4.pipeline(data.router.node)
+                .match({type: 2}).result();
+
+            links.update(result);
+
+            statCharts.forEach(function(s, i){
+                var histData = data[s.entity][s.granularity],
+                    rankMax = ranks[s.entity][s.granularity];
+                histData.forEach(function(d){d.mRank = d.rank % rankMax;});
+                histograms[i].vis.update(histData);
+            });
+
         }
 
         nv.updateHistogram = function(i, e, g, a) {
             histograms[i].vis = null;
             histograms[i].removeChild(histograms[i].lastChild);
 
-            histograms[i].vis = makeHistogram(jsonData, {entity: e, granularity: g, attribute: a}, histograms[i]);
+            histograms[i].vis = makeHistogram(data, {entity: e, granularity: g, attribute: a}, histograms[i]);
         }
 
-        p4.io.ajax.get({
-            // url: "/topologydata/" + (step),
-            url: "/timerange/" + stepStart + "/" + (stepStart+numStep),
-            dataType: "json"
-        }).then(function(json){
-            // console.log(json);
-            jsonData = json;
-            init(json);
-        });
+        // p4.io.ajax.get({
+        //     // url: "/topologydata/" + (step),
+        //     url: "/timerange/" + stepStart + "/" + (stepStart+numStep),
+        //     dataType: "json"
+        // }).then(function(json){
+        //     jsonData = json;
+        //     init(json);
+        // });
+        init();
         nv.rings = rings;
         return nv;
     }
