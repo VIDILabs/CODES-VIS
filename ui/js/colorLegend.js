@@ -6,7 +6,7 @@ function colorLegend(arg){
         option = arg || {},
         width = option.width || 200,
         height = option.height || 30,
-        padding = option.padding || {left: 50, right: 50, top: 0, bottom: 0},
+        padding = option.padding || {left: 20, right: 40, top: 0, bottom: 0},
         vmap = option.vmap || {},
         stats = option.stats || {},
         alpha = option.alpha || 0.2,
