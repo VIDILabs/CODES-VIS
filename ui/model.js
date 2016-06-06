@@ -7,17 +7,32 @@ function Model(arg) {
         metadata = option.metadata || option.meta || null,
         binary = option.data || option.binary || null,
         cache = option.cache || false,
-        datasetID = metadata.datasetID,
+        datasetID = option.datasetID || 0,
         ctypes = p4.ctypes.ctypes,
         entities = ["terminal", "router"],
         granularities = ["group", "router", "node"];
 
-    if(!(metadata && binary)) throw new Error("No metadata or data loaded in Model!");
 
     var DataStore = {
         terminal: { group: {}, router: {}, node: {} },
         router: { group: {}, router: {}, node: {} }
     };
+
+    // p4.io.ajax.get({
+    //     url: "/data/" + datasetID,
+    //     dataType: "arraybuffer"
+    // }).then(function(data){
+    //     binary = data;
+    //     return p4.io.ajax.get({
+    //         url: "/metadata/" + datasetID,
+    //         dataType: "json"
+    //     })
+    // }).then(function(md){
+    //     metadata = md;
+    //     console.log(metadata);
+    // });
+
+    if(!(metadata && binary)) throw new Error("No metadata or data loaded in Model!");
 
     if(cache){
         var offset = 0;
@@ -72,6 +87,7 @@ function Model(arg) {
             }
             callback(result);
         } else { //get data from server backend
+            console.log(e,g,n);
             p4.io.ajax.get({
                 url: "/timeseries?" + ["datasetID="+datasetID, "entity="+e, "granu="+g, "start="+start, "end="+end].join("&"),
                 dataType: "arraybuffer"

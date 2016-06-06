@@ -27,8 +27,7 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
             routerRadix = option.routerRadix,
             struct = option.struct,
             statCharts = option.statCharts,
-            onhover = option.onhover;
-
+            onhover = option.onhover || null;
 
         width -= margin.left + margin.right;
         height -= margin.top + margin.bottom;
@@ -42,10 +41,13 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
         statViewDiv.style.margin = "30px 0 0 0";
         statViewDiv.style.display = "none";
         container.appendChild(statViewDiv);
-        statCharts.forEach(function(s,si){
-            histograms[si] = document.createElement('div');
-            statViewDiv.appendChild(histograms[si]);
-        })
+
+        if(statCharts){
+            statCharts.forEach(function(s,si){
+                histograms[si] = document.createElement('div');
+                statViewDiv.appendChild(histograms[si]);
+            })
+        }
 
         svg.setAttribute("id", "topoView");
         svg.style.position = "absolute";
@@ -117,6 +119,7 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
 
         function init(){
             struct.forEach(function(s){
+                if(!s.config) return;
                 var result = (s.data) ? s.data : data[s.entity][s.level];
                 // console.log(result.length);
                 var ring = ringChart({
@@ -163,14 +166,14 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
                 count: numGroup,
                 container: svg,
                 onhover: function(d) {
-                    onhover(d);
+                    if(onhover) onhover(d);
                     links.select(d);
                 }
             });
 
             //remove all highlights when the mouse leaves SVG
             groupGrid.onmouseleave = function() {
-                onhover(-1);
+                if(onhover) onhover(-1);
                 links.select(-1);
             }
 
@@ -182,9 +185,12 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
                  minZoom: 0.1
             });
             // nv.hide();
-            statCharts.forEach(function(s, si){
-                histograms[si].vis = makeHistogram(data, s, histograms[si]);
-            });
+            //
+            if(statCharts){
+                statCharts.forEach(function(s, si){
+                    histograms[si].vis = makeHistogram(data, s, histograms[si]);
+                });
+            }
         }
 
 
@@ -226,12 +232,14 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
 
             links.update(result);
 
-            statCharts.forEach(function(s, i){
-                var histData = data[s.entity][s.granularity],
-                    rankMax = ranks[s.entity][s.granularity];
-                histData.forEach(function(d){d.mRank = d.rank % rankMax;});
-                histograms[i].vis.update(histData);
-            });
+            if(statCharts){
+                statCharts.forEach(function(s, i){
+                    var histData = data[s.entity][s.granularity],
+                        rankMax = ranks[s.entity][s.granularity];
+                    histData.forEach(function(d){d.mRank = d.rank % rankMax;});
+                    histograms[i].vis.update(histData);
+                });
+            }
 
         }
 

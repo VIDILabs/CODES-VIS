@@ -117,44 +117,44 @@ function dragonflyLink(arg){
             }
         }
 
-        var legendPos = width - 20,
-            legend = ring.append("g");
-        var grad = container.append("defs")
-            .append("linearGradient")
-                .attr("id", "gradlegend")
-                .attr("x1", "0%")
-                .attr("x2", "0%")
-                .attr("y1", "0%")
-                .attr("y2", "100%");
-            grad.append("stop")
-                .attr("offset", "0%" )
-                .attr("stop-color", 'white');
-                // .attr("stop-opacity", min/rankTotal);
-            grad.append("stop")
-            .attr("offset", "100%" )
-            .attr("stop-color", 'orange');
-            // .attr("stop-opacity", 1.0);
-
-        legend.append("rect")
-            .attr("x", legendPos)
-            .attr("y", 10)
-            .attr("width", 20)
-            .attr("height", 0.1*height)
-            .css("fill","url(#gradlegend)");
-
-        legend.append("text")
-            .attr("x", legendPos)
-            .attr("y", 15)
-            .css("fill", "#222")
-            .css("font-size", ".9em")
-            .text(p4.io.printformat(".2s")(stats[vmap.color].min));
-
-        legend.append("text")
-            .attr("x", legendPos)
-            .attr("y", 0.1*height+25)
-            .css("fill", "#222")
-            .css("font-size", ".9em")
-            .text(p4.io.printformat(".2s")(stats[vmap.color].max));
+        // var legendPos = width - 20,
+        //     legend = ring.append("g");
+        // var grad = container.append("defs")
+        //     .append("linearGradient")
+        //         .attr("id", "gradlegend")
+        //         .attr("x1", "0%")
+        //         .attr("x2", "0%")
+        //         .attr("y1", "0%")
+        //         .attr("y2", "100%");
+        //     grad.append("stop")
+        //         .attr("offset", "0%" )
+        //         .attr("stop-color", 'white');
+        //         // .attr("stop-opacity", min/rankTotal);
+        //     grad.append("stop")
+        //     .attr("offset", "100%" )
+        //     .attr("stop-color", 'orange');
+        //     // .attr("stop-opacity", 1.0);
+        //
+        // legend.append("rect")
+        //     .attr("x", legendPos)
+        //     .attr("y", 10)
+        //     .attr("width", 20)
+        //     .attr("height", 0.1*height)
+        //     .css("fill","url(#gradlegend)");
+        //
+        // legend.append("text")
+        //     .attr("x", legendPos)
+        //     .attr("y", 15)
+        //     .css("fill", "#222")
+        //     .css("font-size", ".9em")
+        //     .text(p4.io.printformat(".2s")(stats[vmap.color].min));
+        //
+        // legend.append("text")
+        //     .attr("x", legendPos)
+        //     .attr("y", 0.1*height+25)
+        //     .css("fill", "#222")
+        //     .css("font-size", ".9em")
+        //     .text(p4.io.printformat(".2s")(stats[vmap.color].max));
 
         ring.select = function(selectGroup) {
             links.forEach(function(link, i){

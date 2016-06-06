@@ -31,7 +31,6 @@
     <div class="container-fluid" id="wrapper">
         <div id="datasets">
             <h3>Data Sets</h3>
-
             <table class="table table-striped">
               <thead>
                 <tr>
@@ -50,39 +49,33 @@
         <div class="layout" id="layout-temporal-analysis" style="display: none;"></div>
         <div class="layout" id="layout-correlation-analysis" style="display: none;"></div>
 
-        <!-- <button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#myModal">
-          Launch demo modal
-        </button> -->
 
         <!-- Modal -->
-        <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
-          <div class="modal-dialog modal-lg" role="document"  style="width: 85vw;">
+        <div class="modal fade" id="mainModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+          <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
               <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                <h4 class="modal-title" id="myModalLabel">Modal title</h4>
               </div>
-              <div class="modal-body" style="height: 80vh;">
+              <div class="modal-body" style="height: 85vh;">
                   <div class="row">
-                    <div class="col-md-6">
-                        <table class="table table-striped">
-                          <thead>
-                            <tr>
-                              <th>Order</th>
-                              <th>Entity</th>
-                              <th>Granularity</th>
-                              <th>Length</th>
-                              <th>Color</th>
-                              <th>Scale</th>
-                            </tr>
-                          </thead>
-                          <tbody> </tbody>
-                        </table>
 
-                    </div>
-                    <div class="col-md-6 col-md-offset-6">
+                    <table class="table table-striped">
+                      <thead>
+                        <tr>
+                          <th>Order</th>
+                          <th>Entity</th>
+                          <th>Granularity</th>
+                          <th>Size</th>
+                          <th>Color</th>
+                          <th>Color Mapping</th>
+                        </tr>
+                      </thead>
+                      <tbody id="networkViewSetting"> </tbody>
+                    </table>
 
-                    </div>
+                    <div id="networkGraph" style="margin-left: 50px;"></div>
+
                   </div>
               </div>
               <div class="modal-footer">
@@ -92,6 +85,7 @@
             </div>
           </div>
         </div>
+        <!-- End of Modal -->
     </div>
 
 
@@ -116,6 +110,7 @@
                     temporalAnalysis(datasets.selectedDataID, "layout-temporal-analysis");
                 }
                 $('[data-toggle="popover"]').popover({ container: 'body'})
+                $('mainModal').modal();
             });
             $("#correlation-analysis-button").click(function(){
                 $("#wrapper > div").css("display", "none");

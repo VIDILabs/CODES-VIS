@@ -2,12 +2,13 @@ var dependencies = [
     'vui/panel',
     'vui/dropdown',
     'model',
-    'js/widget',
     'js/linechart',
-    'views/network-dragonfly'
+    'views/multivariateTimeseries',
+    'views/networkDragonfly',
+    'js/colorLegend',
 ];
 
-define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, circularGraph) {
+define(dependencies, function(Panel, DropDownMenu, Model, linechart, MultivariateTimelineView, dragonflyView, colorLegend) {
     'use strict';
     return function main(datasetID, layoutID){
         var SAMPLE_RATE,
@@ -23,8 +24,11 @@ define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, cir
             data = {},
             ctypes = p4.ctypes.ctypes;
 
-        var entity = "terminal",
+        var entities = ["terminal","router"],
+            granularities = ["group", "router", "node/port"],
+            entity = "terminal",
             granularity = "node";
+
 
         function getRankPerGroup(e, g) {
             var rg = {
@@ -66,6 +70,7 @@ define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, cir
 
         var viewRight = "Network",
             networkView,
+            networkPreview,
             viewRightWidth = window.innerHeight * 0.65,
             statCharts = [];
 
@@ -74,8 +79,19 @@ define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, cir
             width: window.innerHeight * 0.65,
             height: window.innerHeight * 0.65,
             header: true,
-            info: { content: "This panel shows newtork view or statstical view.", float: "left", placement: "left"},
-            loadIndicator: "/style/img/loading-indicator.gif"
+            info: {
+                float: "left",
+                placement: "left",
+                content: "Network View: Show the topological structure of the network.Each wedge is lable with the groop id. Mouse over each wedge will result in highlighting of the corresponding line(s) in the Time Range View " +
+                    "<br />Statistical View: Show the statistical value of each attribute selected from the Time Range View. The histogram shows the average values."
+            },
+            external: {
+                title: "setting",
+                target: "#mainModal",
+                float: "left",
+
+            }
+            // loadIndicator: "/style/img/loading-indicator.gif"
         });
 
         var panelLeft = Panel({
@@ -83,29 +99,30 @@ define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, cir
             width: window.innerWidth - 50 - window.innerHeight * 0.65,
             height: window.innerHeight * 0.65 - 30,
             header: true,
+            title: " Time Range View",
+            info: {float: "left",  placement: "right", content: "This view contains three visualization pannels. Each pannel is independent of one another. User can select the attribute, granularity, and entity. There are two types of visualization: time series and heatmap."},
+        });
+
+        var summaryPanel = Panel({
+            container: layoutID,
+            width: window.innerWidth - 40,
+            // width: 920,
+            height: window.innerHeight * 0.2,
+            header: true,
+            header: true,
+            info: {float: "left",  placement: "right", content: "A timeline graph that shows the normalized mean of each attributes of the data.<br />"+
+                  "Serves as a time range selection for the Time Range and Network/Statistial view." +
+                  "The drop down menu is use to select the terminal and router property"},
+            loadIndicator: "/style/img/loading-indicator.gif",
         });
 
         panelLeft.body.style.padding = "10px";
-        panelLeft.title = "Time Range View";
         panelRight.header.style.position = "absolute";
         panelRight.header.style.zIndex = "999999";
-
-
-        // var selectViewLeft = DropDownMenu({
-        //     container: panelLeft.header,
-        //     options: ["Range", "Correlation"],
-        //     selected: 0,
-        //     label: "View",
-        //     float: "left"
-        // });
-
         panelRight.style.position = "absolute";
-        // panelRight.body.style.padding = "20px";
         panelRight.style.left = window.innerWidth - 40 - window.innerHeight * 0.65 + "px";
         panelRight.top = 0;
         panelRight.style.float = "none";
-        // panelRight.title = "Statistical View";
-
 
         var selectViewRight = DropDownMenu({
             container: panelRight.header,
@@ -123,14 +140,14 @@ define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, cir
             url: "/data/" + datasetID,
             dataType: "arraybuffer"
         }).then(function(binary){
-            binaryData = binary
+            binaryData = binary;
             return p4.io.ajax.get({
                 url: "/metadata/" + datasetID,
                 dataType: "json"
             })
         }).then(function(md){
             md.datasetID = datasetID;
-            database = Model({metadata: md, data: binaryData});
+            database = Model({metadata: md, data: binaryData, datasetID: datasetID, cache: true});
             console.log(md);
             meta = md;
             NUM_GROUP = md.numGroup;
@@ -166,7 +183,7 @@ define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, cir
             // if(numPanel > attributes.length) numPanel = attributes.length;
             for(var i = 0; i < numPanel; i++){
                 var granus = ['group', 'router', 'node'];
-                panels[i] = Widget({
+                panels[i] = MultivariateTimelineView({
                     width: window.innerWidth - 130 - window.innerHeight * 0.65,
                     height: window.innerHeight * 0.2 - 86 ,
                     container: panelLeft.body,
@@ -179,15 +196,6 @@ define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, cir
                 panels[i].rank = i;
                 updateVis(panels[i]);
             }
-
-            var summaryPanel = Panel({
-                container: layoutID,
-                width: window.innerWidth - 40,
-                // width: 920,
-                height: window.innerHeight * 0.2,
-                header: true,
-                loadIndicator: "/style/img/loading-indicator.gif",
-            });
 
             function showOverview(entity, granularity) {
                 var timeSeries = {};
@@ -237,6 +245,7 @@ define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, cir
                     if(viewRight == "Network") {
                         database.aggregateByTimeRange(stepStart, (stepStart+numStep), function(result){
                             networkView.update(result);
+                            networkPreview.update(result);
                         })
 
                     }
@@ -246,17 +255,18 @@ define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, cir
                 }
             }
 
-            var struct = [
-                {entity: "router", level: "router", vmap: {color: "global_busytime"}, circle: false, radius: viewRightWidth/4, thick: 10},
-                {entity: "router", level: "router", vmap: {size: "local_traffic", color: "local_busytime"}, circle: false, radius: viewRightWidth/4+20, thick: 50},
+            var structs = [
+                {entity: "router", level: "router", vmap: {color: "global_traffic"}, circle: false, radius: viewRightWidth/4, type: 'links', colors: ['white', 'orange'], config: false},
+                {entity: "router", level: "router", vmap: {color: "global_busytime"}, circle: false, radius: viewRightWidth/4, thick: 10, type: 'bar', config: true},
+                {entity: "router", level: "router", vmap: {size: "local_traffic", color: "local_busytime"}, circle: false, radius: viewRightWidth/4+20, thick: 50, type: 'bar', config: true},
                 // {entity: "terminal", level: "group", vmap: {color: "busy_time", size: "data_size (Byte)"}, circle: false, radius: 210 + 10*TERMINAL_PER_ROUTER, thick: 40},
-                {entity: "router", level: "group", vmap: {color: "terminal_busytime", size: "terminal_traffic"}, circle: false, radius: viewRightWidth/4+70, thick: 40},
+                {entity: "router", level: "group", vmap: {color: "terminal_busytime", size: "terminal_traffic"}, circle: false, radius: viewRightWidth/4+70, thick: 40, type: 'bar', config: true},
             ];
 
             showOverview(entity, granularity);
 
             database.aggregateByTimeRange(stepStart, (stepStart+numStep), function(result){
-                networkView = circularGraph({
+                networkView = dragonflyView({
                     width: window.innerHeight * 0.65,
                     height: window.innerHeight * 0.65,
                     stats: meta,
@@ -267,7 +277,7 @@ define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, cir
                     numRouter: NUM_ROUTER,
                     numTerminal: NUM_TERMINAL,
                     routerRadix: ROUTER_RADIX,
-                    struct: struct,
+                    struct: structs,
                     data: result,
                     statCharts: statCharts,
                     onhover: function(groupId){
@@ -275,6 +285,79 @@ define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, cir
                             panel.highlight(groupId, getRankPerGroup(panel.entity(), panel.granularity()));
                         })
                     }
+                });
+                function getAttr(e, g) {
+                    var a = md[e][g].names.filter(function(n){
+                        return (["timestamp", "rank", "port", "router_id", "group_id", "type"].indexOf(n)===-1);
+                    })
+
+                    return ['----'].concat(a);
+                }
+                $("#networkViewSetting").html("");
+                structs.forEach(function(struct, si){
+                    var tr = $("<tr/>"), td = $("<td/>");
+
+                    var attributes = getAttr(struct.entity, struct.level),
+                        e = DropDownMenu({options: entities, selected: entities.indexOf(struct.entity)}),
+                        g = DropDownMenu({options: granularities, selected: granularities.indexOf(struct.level)}),
+                        sizeAttr = DropDownMenu({options: attributes, selected: attributes.indexOf(struct.vmap.size)}),
+                        colorAttr = DropDownMenu({options: attributes, selected: attributes.indexOf(struct.vmap.color)});
+
+                    e.onchange = function(_) {
+                        if(_=='----') return;
+                        struct.entity = _;
+                        sizeAttr.changeOptions(getAttr(struct.entity, struct.level), 0);
+                        colorAttr.changeOptions(getAttr(struct.entity, struct.level), 0);
+                    };
+
+                    g.onchange = function(_) {
+                        if(_=='----') return;
+                        if(_ == "node/port") _ = "node";
+                        struct.level = _;
+                        sizeAttr.changeOptions(getAttr(struct.entity, struct.level));
+                        colorAttr.changeOptions(getAttr(struct.entity, struct.level));
+                    }
+
+                    var colorDomain = p4.stats(result[struct.entity][struct.level], [struct.vmap.color])[struct.vmap.color];
+
+                    console.log(colorDomain);
+
+                    if(struct.config){
+                        tr.append([
+                            $("<td/>").text(si),
+                            $("<td/>").append(e),
+                            $("<td/>").append(g),
+                            $("<td/>").append(sizeAttr),
+                            $("<td/>").append(colorAttr),
+                            $("<td/>").css({width: 250}).append(colorLegend({width: 200, height: 20, colors: struct.colors, domain: [colorDomain.min, colorDomain.max] }))
+                        ]);
+                    } else {
+                        tr.append([
+                            $("<td/>").text(si),
+                            $("<td/>").append(struct.entity),
+                            $("<td/>").append(struct.level),
+                            $("<td/>").append(struct.vmap.size),
+                            $("<td/>").append(struct.vmap.color),
+                            $("<td/>").css({width: 250}).append(colorLegend({width: 200, height: 20, colors: struct.colors, domain: [colorDomain.min, colorDomain.max] }))
+                        ]);
+                    }
+                    $("#networkViewSetting").append(tr);
+                });
+                var previewContainer = document.getElementById("networkGraph");
+                previewContainer.innerHTML = "";
+                networkPreview = dragonflyView({
+                    width: window.innerHeight * 0.65,
+                    height: window.innerHeight * 0.65,
+                    stats: meta,
+                    container: previewContainer,
+                    stepStart: stepStart,
+                    numStep: numStep,
+                    numGroup: NUM_GROUP,
+                    numRouter: NUM_ROUTER,
+                    numTerminal: NUM_TERMINAL,
+                    routerRadix: ROUTER_RADIX,
+                    struct: structs,
+                    data: result
                 });
             }),
 
@@ -307,7 +390,7 @@ define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, cir
                 attribute: attributes[0]
             };
 
-            if(networkView) networkView.updateHistogram(panel.rank, e, g, a);6
+            if(networkView) networkView.updateHistogram(panel.rank, e, g, a);
 
             database.select({
                 entity: e,
@@ -325,33 +408,8 @@ define(dependencies, function(Panel, DropDownMenu, Model, Widget, linechart, cir
                         formatX: function(d) { return p4.io.printformat(".2s")(d / 1000000) + "ms"; },
                         formatY: p4.io.printformat(".2s")
                     });
-
                 }
             });
-
-            // if(temporalData[e][g] === null) {
-            //     p4.io.ajax.get({
-            //         url: dataURL,
-            //         dataType: "arraybuffer"
-            //     }).then(function(binary){
-            //         var size = meta[e][g].rankTotal * (numStep+1),
-            //             offset = 0,
-            //             types = meta[e][g].types,
-            //             names = meta[e][g].names,
-            //             data = {};
-            //
-            //         names.forEach(function(n, i){
-            //             data[n] = new ctypes[types[i]](binary.slice(offset, offset+size*ctypes[types[i]].BYTES_PER_ELEMENT));
-            //             offset += size * ctypes[types[i]].BYTES_PER_ELEMENT;
-            //         });
-            //
-            //         temporalData[e][g] = data;
-            //         _update(temporalData);
-            //
-            //     });
-            // } else {
-            //     _update(temporalData);
-            // }
         }
     }
 });
