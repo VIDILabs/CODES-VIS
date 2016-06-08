@@ -6,7 +6,7 @@ function mmtsPlot(arg){
         option = arg || {},
         width = option.width || 800,
         height = option.height || 300,
-        padding = option.padding || {left: 50, right: 10, top: 10, bottom: 20},
+        padding = option.padding || {left: 50, right: 10, top: 10, bottom: 25},
         vmap = option.vmap || {},
         stats = option.stats || {},
         alpha = option.alpha || 0.2,
@@ -30,8 +30,8 @@ function mmtsPlot(arg){
     x.axis = null;
     y.axis = null;
     // console.log(stats);
-    // width -= padding.left+padding.right;
-    // height -= padding.bottom;
+    width -= padding.left+padding.right;
+    height -= padding.top+padding.bottom;
 
     var webgl = i2v.WebGL({
         container: container,
@@ -172,7 +172,7 @@ function mmtsPlot(arg){
             dim: "x",
             domain: [mmts.stats[vmap.x].min, mmts.stats[vmap.x].max],
             align: "bottom",
-            ticks: 8,
+            ticks: 12,
             // tickInterval: 10000000,
             labelPos: {x: 0, y: -20},
             format: formatX

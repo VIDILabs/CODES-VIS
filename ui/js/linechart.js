@@ -59,7 +59,7 @@ function lineChart(arg){
 
     var xDomain = [i2v.arrays.min(timestamps), i2v.arrays.max(timestamps)],
         yDomain = [i2v.arrays.min(minVals), i2v.arrays.max(maxVals)];
-
+    if(yDomain[0] === yDomain[1]) yDomain[1] += 0.000001;
     var x = svg.axis({
         dim: "x",
         domain: xDomain,
@@ -229,7 +229,7 @@ function lineChart(arg){
         .text("Normalized Mean");
 
     Object.keys(series).forEach(function(si,j){
-        var legendPos = width,
+        var legendPos = width - 30,
             // legendWidth = legendPos / Object.keys(series).length;
             legendWidth = 120;
         legend.append("line")

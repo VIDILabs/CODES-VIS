@@ -48,14 +48,14 @@ function colorLegend(arg){
 
     legend.append("text")
         .attr("x", 0)
-        .attr("y", height/2)
+        .attr("y", height/2 + 5)
         .css("fill", "#222")
         .css("font-size", ".9em")
         .text(p4.io.printformat(".2s")(domain[0]));
 
     legend.append("text")
         .attr("x", width + padding.left + 5)
-        .attr("y", height/2)
+        .attr("y", height/2 + 5)
         .css("fill", "#222")
         .css("font-size", ".9em")
         .text(p4.io.printformat(".2s")(domain[1]));

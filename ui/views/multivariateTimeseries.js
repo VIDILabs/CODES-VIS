@@ -26,32 +26,33 @@ define(deps, function(Panel, DropDownMenu, mmtsPlot, glHeatmap){
 
         var panel = Panel({
             container: container,
-            width: width + padding.left + padding.right,
-            height: height + padding.top + padding.bottom,
+            width: width,
+            height: height,
             header: true,
         });
 
-        menu.vis = DropDownMenu({
+        // menu.vis = DropDownMenu({
+        //     container: panel.header,
+        //     options: ["time series", "heatmap"],
+        //     selected: 0,
+        //     label: "Visualization",
+        //     // float: "right"
+        // }).onchange = function(vis) {
+        //     selectVis = vis;
+        //     onchange(widget);
+        // };
+        menu.attribute = DropDownMenu({
             container: panel.header,
-            options: ["time series", "heatmap"],
-            selected: 0,
-            label: "Visualization",
+            options: attributes,
+            selected: selectedAttribute,
+            label: "Attribute",
             // float: "right"
-        }).onchange = function(vis) {
-            selectVis = vis;
+        });
+        menu.attribute.onchange = function(d){
+            selectedAttribute = attributes.indexOf(d);
+            // plot.remap({ x: "timestamp", y: d});
+            // plot.render();
             onchange(widget);
-        };
-
-        menu.entity = DropDownMenu({
-            container: panel.header,
-            options: ["terminal", "router"],
-            selected: 0,
-            label: "Entity",
-            float: "right"
-        }).onchange = function(d) {
-            entity = d;
-            changeSelectedAttriubte = true;
-            onchange(widget, entity, granularity);
         };
 
         menu.granularity = DropDownMenu({
@@ -59,27 +60,30 @@ define(deps, function(Panel, DropDownMenu, mmtsPlot, glHeatmap){
             options: [ "group", "router", "node/port"],
             selected: [ "group", "router", "node"].indexOf(granularity),
             label: "Granularity",
-            float: "right"
+            // float: "right"
         })
+
+        menu.entity = DropDownMenu({
+            container: panel.header,
+            options: ["terminal", "router"],
+            selected: 0,
+            label: "Entity",
+            // float: "right"
+        }).onchange = function(d) {
+            entity = d;
+            changeSelectedAttriubte = true;
+            onchange(widget, entity, granularity);
+        };
+
+
 
         menu.granularity.onchange = function(d) {
             granularity = d.split("/")[0];
             onchange(widget, entity, granularity);
         };
-        menu.attribute = DropDownMenu({
-            container: panel.header,
-            options: attributes,
-            selected: selectedAttribute,
-            label: "Attribute",
-            float: "right"
-        });
 
-        menu.attribute.onchange = function(d){
-            selectedAttribute = attributes.indexOf(d);
-            // plot.remap({ x: "timestamp", y: d});
-            // plot.render();
-            onchange(widget);
-        };
+
+
         // menu.vis = DropDownMenu({
         //     container: panel.header,
         //     options: ["time series", "area", "heat map"],

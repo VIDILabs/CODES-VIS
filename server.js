@@ -3,7 +3,7 @@ var fs = require('fs'),
     express = require('express'),
     bodyParser = require('body-parser'),
     app = express(),
-    WebSocketServer = require("ws").Server,
+    //WebSocketServer = require("ws").Server,
     server = require('http').Server(app),
     // socketio = require('socket.io')(server),
     YAML = require('yamljs');
@@ -489,7 +489,12 @@ app.get('/meta/:dataID/:entity/:granu', function(req, res){
         entity = req.params.entity,
         granu = req.params.granu;
 
-    res.json(datasets[dataID].metadata[entity][granu]);
+    var md = datasets[dataID].metadata[entity][granu];
+
+    md.stepTotal = datasets[dataID].metadata[entity].stepTotal;
+    md.sampleRate = datasets[dataID].metadata.sampleRate;
+
+    res.json(md);
 });
 
 app.get('/data/:dataID', function(req, res){

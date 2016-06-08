@@ -1,10 +1,11 @@
 var dependencies = [
     'vui/panel',
     'vui/dropdown',
-    'js/sankey'
+    'js/sankey',
+    'js/slider'
 ];
 
-define(dependencies, function(Panel, DropDownMenu, Sankey) {
+define(dependencies, function(Panel, DropDownMenu, Sankey, Slider) {
 
     return function main(datasetID, layoutID){
 
@@ -14,7 +15,11 @@ define(dependencies, function(Panel, DropDownMenu, Sankey) {
             width = 1000,
             height = 830,
             vh = 0.20,
-            padding = {left: 60, right: 30, top: 35, bottom: 30};
+            padding = {left: 60, right: 100, top: 35, bottom: 30};
+
+        var binary,
+            entity = "terminal",
+            granularity = "node";
 
         var container = Panel({
                 container: layoutID,
@@ -25,22 +30,39 @@ define(dependencies, function(Panel, DropDownMenu, Sankey) {
 
         container.title = "Correlation Analysis";
 
+        var sliderTop = document.createElement("div");
+        var sliderBottom = document.createElement("div");
+
         DropDownMenu({
             container: container.header,
             options: ["terminal", "router"],
             selected: 0,
             label: "Entity",
             float: "right"
-        });
+        }).onchange = function(d) {
+            entity = d;
+            sliderTop.innerHTML = "";
+            sliderBottom.innerHTML = "";
+            container.clear();
+            init();
+        };
 
         DropDownMenu({
             container: container.header,
             options: ["group", "router", "node/port"],
-            selected: 0,
+            selected: 2,
             label: "Granularity",
             float: "right"
-        });
+        }).onchange = function(d) {
+            granularity = (d == "node/port") ? "node" : d;
+            container.clear();
+            sliderTop.innerHTML = "";
+            sliderBottom.innerHTML = "";
+            init();
+        };;
 
+
+        function init() {
         var panelTop = Panel({
                 container: container.body,
                 width: width + padding.left + padding.right,
@@ -105,13 +127,48 @@ define(dependencies, function(Panel, DropDownMenu, Sankey) {
         container.append(svgBottom);
         // svgMid.appendChild();
 
+
+
+        sliderTop.setAttribute("id", "sliderTop");
+        sliderTop.style.position = "absolute";
+        sliderTop.style.top = "100px";
+        sliderTop.style.left = width + padding.right + "px";
+        container.appendChild(sliderTop);
+
+        var slider1 = new Slider({
+             width: 100,
+             height: 150,
+             bins: bins.a,
+             container: "sliderTop",
+             callback: function dragend(d){
+                 bins.a = slider1.getPercentage();
+                 showAggregation();
+             }
+         });
+
+
+         sliderBottom.setAttribute("id", "sliderBottom");
+         sliderBottom.style.position = "absolute";
+         sliderBottom.style.top = height * (vh*3+0.2) + 100 + "px";
+         sliderBottom.style.left = width + padding.right + "px";
+         container.appendChild(sliderBottom);
+
+         var slider2 = new Slider({
+              width: 100,
+              height: 150,
+              bins: bins.b,
+              container: "sliderBottom",
+              callback: function dragend(d){
+                   bins.b = slider2.getPercentage();
+                   showAggregation();
+              }
+          });
+
         var vmap = {x:"timestamp", y: "rank"},
             analyticModel = 3;
         // var vmap = {x:"timestamp", y: "rank", a: "traffic_global0", b: "traffic_local5"};
 
-        var binary,
-            entity = "terminal",
-            granularity = "node";
+
 
         p4.io.ajax.get({
             url: "/binary/" + [datasetID, entity, granularity].join("/"),
@@ -332,6 +389,7 @@ define(dependencies, function(Panel, DropDownMenu, Sankey) {
             timeSteps = [ts[0], ts[Math.floor(ts.length*0.3-1)], ts[Math.floor(ts.length*0.6-1)], ts[Math.floor(ts.length*0.9-1)]];
 
             showAggregation = function showAggregation() {
+                console.log(bins);
                 try {svgMid.removeChild(sankey) } catch(e){};
                 var clusters = [],
                     clinks = [],
@@ -947,5 +1005,8 @@ define(dependencies, function(Panel, DropDownMenu, Sankey) {
              }
 
         });
+
+        }
+        init();
     };
 });

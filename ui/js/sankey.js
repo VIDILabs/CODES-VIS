@@ -190,7 +190,7 @@ function Sankey(option){
 
         var sankeyNodes = svg.append("g");
         var node = sankeyNodes.append("g");
-        var attrColor = ["red", "orange", "green"];
+
 
         data.nodes.forEach(function(d){
             if(d.count>0){
@@ -228,6 +228,26 @@ function Sankey(option){
 
             }
         });
+
+        var attrColor = ["red", "orange", "#0E0"],
+            levels = ["high", "mid", "low"];
+
+        attrColor.forEach(function(c, i){
+            node.append("rect")
+                .attr("x", width)
+                .attr("y", height/3 + nodeWidth*4*i)
+                .attr("width", nodeWidth*2)
+                .attr("height", nodeWidth*2)
+                .css("fill", c);
+
+            node.append("text")
+                .attr("x", width + nodeWidth*2 + 5)
+                .attr("y", height/3 + nodeWidth*4*i + nodeWidth*1.5)
+                .css("fill", "#222")
+                .css("font-size", ".9em")
+                .text(levels[i]);
+        })
+
 
         sankeyNodes.translate(padding.left, padding.top);
         sankeyLinks.translate(padding.left, padding.top);

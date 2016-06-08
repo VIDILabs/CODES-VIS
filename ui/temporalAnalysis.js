@@ -82,8 +82,8 @@ define(dependencies, function(Panel, DropDownMenu, Model, linechart, Multivariat
             info: {
                 float: "left",
                 placement: "left",
-                content: "Network View: Show the topological structure of the network.Each wedge is lable with the groop id. Mouse over each wedge will result in highlighting of the corresponding line(s) in the Time Range View " +
-                    "<br />Statistical View: Show the statistical value of each attribute selected from the Time Range View. The histogram shows the average values."
+                content: "Network View: Shows the topological structure of the network.Each wedge is lable with the groop id. Mouse over each wedge will result in highlighting of the corresponding line(s) in the Time Range View " +
+                    "<br />Statistical View: Shows the statistical value of each attribute selected from the Time Range View. The histogram shows the average values."
             },
             external: {
                 title: "setting",
@@ -100,7 +100,7 @@ define(dependencies, function(Panel, DropDownMenu, Model, linechart, Multivariat
             height: window.innerHeight * 0.65 - 30,
             header: true,
             title: " Time Range View",
-            info: {float: "left",  placement: "right", content: "This view contains three visualization pannels. Each pannel is independent of one another. User can select the attribute, granularity, and entity. There are two types of visualization: time series and heatmap."},
+            info: {float: "left",  placement: "right", content: "This view contains three time series plots. Users can select different attributes, granularities, and entities."},
         });
 
         var summaryPanel = Panel({
@@ -110,9 +110,9 @@ define(dependencies, function(Panel, DropDownMenu, Model, linechart, Multivariat
             height: window.innerHeight * 0.2,
             header: true,
             header: true,
-            info: {float: "left",  placement: "right", content: "A timeline graph that shows the normalized mean of each attributes of the data.<br />"+
-                  "Serves as a time range selection for the Time Range and Network/Statistial view." +
-                  "The drop down menu is use to select the terminal and router property"},
+            info: {float: "left",  placement: "right", content: "This timeline plot shows the normalized mean of each attributes of the data.<br />"+
+                  "The sliding window on this plot is for selecting the time range for the Time Range and Network/Statistial view." +
+                  "The drop down menus can be used to select the overview for terminal or router attributes"},
             loadIndicator: "/style/img/loading-indicator.gif",
         });
 
@@ -184,8 +184,8 @@ define(dependencies, function(Panel, DropDownMenu, Model, linechart, Multivariat
             for(var i = 0; i < numPanel; i++){
                 var granus = ['group', 'router', 'node'];
                 panels[i] = MultivariateTimelineView({
-                    width: window.innerWidth - 130 - window.innerHeight * 0.65,
-                    height: window.innerHeight * 0.2 - 86 ,
+                    width: window.innerWidth - window.innerHeight * 0.65 - 80,
+                    height: window.innerHeight * 0.2 - 45,
                     container: panelLeft.body,
                     attributes: attributes,
                     selectedAttribute: 0,
@@ -227,7 +227,8 @@ define(dependencies, function(Panel, DropDownMenu, Model, linechart, Multivariat
 
                 function onTimeRangeChange(newTimeRange) {
                     stepStart = Math.max(1,Math.floor(newTimeRange[0]/SAMPLE_RATE)-1);
-                    numStep = Math.floor(newTimeRange[1]/SAMPLE_RATE) - stepStart;
+                    numStep = Math.min(STEP_TOTAL-1, Math.floor(newTimeRange[1]/SAMPLE_RATE)) - stepStart;
+
                     dataSize = metadata.rankTotal * (numStep+1);
                     // console.log("time range", stepStart, numStep);
                     ts = [];
@@ -260,7 +261,8 @@ define(dependencies, function(Panel, DropDownMenu, Model, linechart, Multivariat
                 {entity: "router", level: "router", vmap: {color: "global_busytime"}, circle: false, radius: viewRightWidth/4, thick: 10, type: 'bar', config: true},
                 {entity: "router", level: "router", vmap: {size: "local_traffic", color: "local_busytime"}, circle: false, radius: viewRightWidth/4+20, thick: 50, type: 'bar', config: true},
                 // {entity: "terminal", level: "group", vmap: {color: "busy_time", size: "data_size (Byte)"}, circle: false, radius: 210 + 10*TERMINAL_PER_ROUTER, thick: 40},
-                {entity: "router", level: "group", vmap: {color: "terminal_busytime", size: "terminal_traffic"}, circle: false, radius: viewRightWidth/4+70, thick: 40, type: 'bar', config: true},
+                // {entity: "router", level: "group", vmap: {color: "terminal_busytime", size: "terminal_traffic"}, circle: false, radius: viewRightWidth/4+70, thick: 40, type: 'bar', config: true},
+                {entity: "terminal", level: "group", vmap: {color: "busy_time", size: "data_size"}, circle: false, radius: viewRightWidth/4+70, thick: 40, type: 'bar', config: true},
             ];
 
             showOverview(entity, granularity);
@@ -322,7 +324,7 @@ define(dependencies, function(Panel, DropDownMenu, Model, linechart, Multivariat
 
                     console.log(colorDomain);
 
-                    if(struct.config){
+                    if(struct.config && false){
                         tr.append([
                             $("<td/>").text(si),
                             $("<td/>").append(e),

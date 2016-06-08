@@ -118,7 +118,7 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
         }
 
         function init(){
-            struct.forEach(function(s){
+            struct.forEach(function(s, si){
                 if(!s.config) return;
                 var result = (s.data) ? s.data : data[s.entity][s.level];
                 // console.log(result.length);
@@ -135,7 +135,7 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
                     dataRange: stats[s.entity][s.level].stats
                 });
 
-                rings.push(ring);
+                rings[si] = ring;
             })
 
             var result = new p4.pipeline(data.router.node)
@@ -223,6 +223,7 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
 
             data = newData;
             struct.forEach(function(s, si){
+                if(!s.config) return;
                 var result = (s.data) ? s.data : data[s.entity][s.level];
                 rings[si].update(result);
             });
