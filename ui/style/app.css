@@ -2,13 +2,22 @@ svg {
     z-index: 99;
     position: absolute;
     user-select: none;
-    /*border: 1px solid #aaa;*/
 }
 
 canvas {
     z-index: 1;
     position: absolute;
 }
+
+
+.screen-center-div{
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    -webkit-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+}
+
 .node rect {
   cursor: move;
   fill-opacity: 0.9;
@@ -60,9 +69,9 @@ canvas {
     height: 200px;
 }
 
-.ui-state-default {
+/*.ui-state-default {
     margin: 20px;
-}
+}*/
 /*.navbar-nav li a {
     color: #222;
     font-weight: bold;
@@ -101,4 +110,13 @@ canvas {
     margin: 10px;
     background-size: 32px;
     background-repeat: no-repeat;
+}
+
+.form-group {
+    margin-right: 20px;
+}
+
+.form-control-label {
+    text-align: right;
+    vertical-align: middle;
 }

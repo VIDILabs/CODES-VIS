@@ -1,0 +1,384 @@
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>i2v Test</title>
+        <style>
+        .i2v-viz {
+            position: relative;
+        }
+        .i2v-viz canvas{
+            position: absolute;
+        }
+        .i2v-viz svg{
+            position: absolute;
+        }
+        </style>
+    </head>
+    <body>
+        <div id="overview">
+            <div id="heatmap" style="float: left;"></div>
+            <div id="parallel-coordinate" style="float: left;"></div>
+            <div id="tlinks" style="float: left;"></div>
+            <div id="scatter-plot" style="float: left;"></div>
+        </div>
+        <div id="projection" style="clear: both;">
+            <div id="projection1" style="float: left;"></div>
+            <div id="projection2" style="float: left; margin-left: 50px"></div>
+        </div>
+
+        <div id="legend" style="margin-left: 650px; margin-top: 50px;"></div>
+        <script src="//d3js.org/d3.v3.min.js"></script>
+        <script src="jam/require.js"></script>
+        <script>
+        require([
+            "p4/io/ajax",
+            "p4/io/parser",
+            "p4/cquery/ctypes",
+            "p4/cquery/cstore",
+            "p4/core/datastruct",
+            "p4/core/pipeline",
+            "p4/core/arrays",
+            "i2v/svg/svg",
+            "flexgl/flexgl",
+            'model/dragonfly',
+            "i2v/colors",
+            "p4/dataopt/stats",
+            "i2v/charts/parallelCoordinate",
+            "i2v/charts/glHeatmap",
+            "i2v/charts/scatter",
+            "js/hierCircles",
+            "js/colorLegend"
+        ],
+        function(
+            ajax,
+            parser,
+            ctypes,
+            CStore,
+            dataStruct,
+            pipeline,
+            arrays,
+            Svg,
+            FlexGL,
+            Dragonfly,
+            Colors,
+            stats,
+            ParallelCoordinate,
+            Heatmap,
+            ScatterPlot,
+            CircularView,
+            colorLegend
+        ){
+            var dataset = "dfly-5k-multiapp/";
+            // var dataset = "random-group/";
+            // var dataset = "bb-cont-4096-nearest/";
+            function nodeColor(d) {
+                if(d == "AMG") return "orange";
+                else if(d == "AMR Boxlib") return "#0A0";
+                else if(d == "MiniFE") return "brown";
+                else  return "#000";
+                // return "teal";
+            }
+
+            function coord(r, d){
+                return [
+                     r*Math.cos(d- Math.PI / 2),
+                     r*Math.sin(d- Math.PI / 2)
+                ];
+            }
+
+
+            visualizeBB(dataset);
+            function visualizeBB(dataset) {
+                console.log(dataset);
+                ajax.getAll([
+                     {url: dataset + "dragonfly-msg-stats", dataType: "text"},
+                     {url: dataset + "dragonfly-router-stats", dataType: "text"},
+                     {url: dataset + "dragonfly-router-traffic", dataType: "text"},
+                     {url: dataset + "workloads.conf", dataType: "text"},
+
+                ])
+                .then(function(text){
+                    var terminalData = parser(text[0], " ");
+                    var terminals = dataStruct({
+                        array: terminalData,
+                        header: ["lp_id", "terminal_id", "data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time"],
+                        types: ["int", "int", "int", "float", "float", "float", "float"],
+                        skip: 1
+                    }).objectArray();
+
+                    terminals.forEach(function(t, ti){
+                        t.router_id = Math.floor(t.terminal_id / 6);
+                        t.router_rank = t.router_id % 12;
+                        t.group_id = Math.floor(t.terminal_id / 6 / 12);
+                        t.workload = "idle";
+                    })
+
+                    var jobNames = ["AMG", "AMR Boxlib", "MiniFE", "idle"];
+                    var jobs = text[3].split("\n").map(function(j){return j.split(" ")});
+                    jobs.pop();
+
+                    jobs.forEach(function(job, ji){
+                        job.forEach(function(tid){
+                            terminals[tid].workload = jobNames[ji];
+                        })
+                    })
+
+                    var ROUTER_PER_GROUP = 12, GLOBAL_LINK = 6, TERMINAL_PER_ROUTER=6;
+
+                    var busytime = dataStruct({
+                        array: parser(text[2], " "),
+                        header: ["lp_id", "group_id", "router_id", "local_busy_time", "global_busy_time"],
+                        types: ["int", "int", "int", "veci"+ROUTER_PER_GROUP, "veci"+GLOBAL_LINK],
+                        skip: 1,
+                    }).objectArray();
+
+                    var traffic = dataStruct({
+                        array: parser(text[1], " "),
+                        header: ["lp_id", "group_id", "router_id", "local_traffic", "global_traffic"],
+                        types: ["int", "int", "int", "veci"+ROUTER_PER_GROUP, "veci"+GLOBAL_LINK],
+                        skip: 1,
+                    }).objectArray();
+
+                    var numNode = terminals.length,
+                        numRouter = traffic.length,
+                        numGroup = ROUTER_PER_GROUP * GLOBAL_LINK + 1;
+
+                    var dfly = Dragonfly({
+                        numRouter : numRouter,
+                        numGroup  : numGroup,
+                        numNode   : numNode,
+                        traffic: traffic,
+                        busytime: busytime,
+                        terminals: terminals
+                    });
+
+                    var localLinkData = [];
+                    dfly.data.forEach(function(d) {
+                        localLinkData = localLinkData.concat(d.local_links);
+                    });
+
+                    var interGroupTraffic = dfly.interGroupConnection().traffic,
+                        interGroupBusyTime = dfly.interGroupConnection().busy_time;
+                    var matrixData = new Float32Array(numGroup * numGroup);
+                    var max = Number.NEGATIVE_INFINITY, min = Number.POSITIVE_INFINITY;
+                    interGroupBusyTime.forEach(function(d, i){
+                        d.forEach(function(c, j){
+                            if( c > max ) max = c;
+                            if( c < min ) min = c;
+                            matrixData[i * numGroup + j] = c;
+                        })
+                    })
+                    localLinkData.forEach(function(d){
+                        d.group_id = Math.floor(d.router_id / ROUTER_PER_GROUP);
+                    })
+
+                    var partitionAttr1 = "group_id",
+                        struct1 = [
+                            {
+                                entity: "router",
+                                level: "router",
+                                vmap: {
+                                    // color: "global_traffic",
+                                    color: "local_busy_time",
+                                    size: "local_traffic"
+                                    },
+                                type: 'links',
+                                size: 0,
+                                groupLabel: true,
+                                partitionAttr: partitionAttr1,
+                                // numPartition: 7,
+                                colors: ['#eee', 'steelblue'],
+
+                            },
+                            {
+                                entity: "global_link",
+
+                                vmap: {
+                                    color: "busy_time",
+                                    size: "traffic"
+                                },
+                                aggregate: "router_port",
+                                colors: ["#eee", "purple"],
+                                size: 1,
+                            },
+                            {
+                                entity: "terminal",
+                                level: "router",
+                                vmap: { color: "busy_time", size: "data_size"},
+                                size: 1,
+                                colors: ["#eee", "teal"],
+                                // colors: nodeColor,
+                                aggregate: ["workload", "router_port"]
+                                // aggregate: true
+                            },
+                        ];
+                        var partitionAttr2 = "workload",
+                            struct2 = [
+                            {
+                                entity: "router",
+                                level: "router",
+                                vmap: {
+                                    // color: "global_traffic"
+                                    color: "global_busy_time",
+                                    size: "global_traffic"
+                                },
+                                type: 'links',
+                                size: 0,
+                                groupLabel: true,
+                                partitionAttr: partitionAttr2,
+                                numPartition: 11,
+                                // colors: ["white", "#cc5500"]
+                                colors: ["#eee", "purple"]
+                            },
+                            {
+                                entity: "router",
+                                // level: "router",
+                                vmap: {
+                                    color: "local_busy_time",
+                                    size: "local_traffic"
+                                },
+                                aggregate: "router_rank",
+                                type: 'bar',
+                                colors: ['#eee', 'steelblue'],
+                                size: 1,
+                            },
+                            {
+                                entity: "terminal",
+                                level: "router",
+                                vmap: {
+                                    size:"avg_packet_latency",
+                                    color: "workload",
+                                    x: "router_id",
+                                    y: "avg_hops",
+                                    opacity: "busy_time"
+                                },
+                                size: 1,
+                                type: 'bar',
+                                colors: nodeColor,
+                                // aggregate: ["workload", "router_rank"]
+                                // aggregate: "router_id"
+                            },
+                        ];
+
+                    new CircularView({
+                        // data: dfly.partition(partitionAttr1, jobNames),
+                        data: dfly.partition(partitionAttr1, 11),
+                        container: "#projection1",
+                        structs: struct1,
+                        width: 700
+                    });
+
+
+                    new CircularView({
+                        data: dfly.partition(partitionAttr2, jobNames),
+                        // data: dfly.partition(partitionAttr, 6,  { group_id: {$inRange: [0,5]}} ),
+                        container: "#projection2",
+                        structs: struct2,
+                        width: 700
+                    });
+
+                    var features =["group_id", "busy_time", "traffic", "router_id"];
+                    var lld = [];
+
+                    features.forEach(function(f){
+                        lld[f] = localLinkData.map(function(d){return d[f]});
+                    });
+
+                    // console.log(cdb.info().keys, cdb.stats());
+                    var pc = new ParallelCoordinate({
+                        container: "parallel-coordinate",
+                        width: 600,
+                        height: 430,
+                        padding: {left: 0, right: 0, top: 40, bottom: 10},
+                        features: features,
+                        axis: [0, 1,1,1,1],
+                        data: lld,
+                        size: localLinkData.length,
+                        domains: stats.domains(localLinkData, features)
+                    });
+
+
+                    var features =[ "router_id", "avg_hops"];
+                    var ttd = [];
+
+                    features.forEach(function(f){
+                        ttd[f] = terminals.map(function(d){return d[f]});
+                    });
+
+                    var terminalLinks = new ParallelCoordinate({
+                        container: "tlinks",
+                        width: 200,
+                        height: 430,
+                        padding: {left: 0, right: 0, top: 40, bottom: 10},
+                        features: features,
+                        axis: [0, 0],
+                        data: ttd,
+                        size: terminals.length,
+                        color: "teal",
+                        domains: stats.domains(terminals, features)
+                    });
+
+                    new Heatmap({
+                        container: "heatmap",
+                        width: 430,
+                        height: 430,
+                        padding: {left: 50, right: 5, top: 40, bottom: 10},
+                        data: matrixData,
+                        size: numGroup,
+                        onselect: function(d) {
+                            pc.filter(0, d);
+                            terminalLinks.filter(0, [d[0]*ROUTER_PER_GROUP, d[1]*ROUTER_PER_GROUP]);
+                        },
+                        oncomplete: function(d) {
+
+                            document.getElementById("projection1").innerHTML = "";
+                            document.getElementById("projection2").innerHTML = "";
+                            var numPart = d[0]-d[1]+1;
+
+                            if(numPart > 20) {
+                                for(var i = 2; i<numPart; i++){
+                                    if(Number.isInteger(numPart / i)) {
+                                        numPart = numPart / i;
+                                        break;
+                                    }
+                                }
+                            }
+                            var groupIDs = d.reverse()
+                            new CircularView({
+                                data: dfly.partition(partitionAttr1, jobNames.concat('idle'), { group_id: {$inRange: groupIDs}}),
+                                // data: dfly.partition(partitionAttr1, numPart, {group_id: {$inRange: groupIDs}}),
+                                container: "#projection1",
+                                structs: struct1,
+                                width: 700
+                            });
+
+                            new CircularView({
+                                data: dfly.partition(partitionAttr2, jobNames.concat('idle'), {group_id: {$inRange: groupIDs}}),
+                                // data: dfly.partition(partitionAttr, 6,  { group_id: {$inRange: [0,5]}} ),
+                                container: "#projection2",
+                                structs: struct2,
+                                width: 700
+                            });
+
+                        }
+                    });
+
+
+                    new ScatterPlot({
+                        container: "scatter-plot",
+                        width: 430,
+                        height: 430,
+                        data: terminals,
+                        vmap: {x: "packets_finished", y: "avg_hops", color: "workload"},
+                        colors: nodeColor,
+                        alpha: 0.5,
+                        padding: {left: 5, bottom: 10, top: 40, right: 50}
+                    });
+                });
+            }
+        });
+
+        </script>
+    </body>
+</html>

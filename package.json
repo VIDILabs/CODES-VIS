@@ -16,8 +16,12 @@
   "author": "Jianping Kelvin Li",
   "license": "MIT",
   "dependencies": {
+    "amdefine": "^1.0.0",
     "body-parser": "~1.13.3",
     "bootstrap": "^3.3.6",
+    "bootstrap-colorpicker": "^2.3.3",
+    "bootstrap-slider": "^7.1.0",
+    "d3-scale": "^1.0.1",
     "express": "~4.13.3",
     "express-ws": "^1.0.0",
     "jquery": "^2.2.4",

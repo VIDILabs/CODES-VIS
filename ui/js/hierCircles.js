@@ -1,41 +1,35 @@
-define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
+define(["p4/core/pipeline", "d3", "i2v/format", "p4/dataopt/stats", "i2v/charts/glHeatmap"],
+function(pipeline, d3, printformat, p4Stats, Heatmap) {
     return function hierCircles(option) {
-
+        console.log("hier cir");
         var data = option.data,
-            width = option.width || 900,
+            width = option.width || 800,
             height = option.height || width,
+            padding = option.padding || 10,
             container = option.container || "body",
             vmap = option.vmap,
             structs = option.structs || [],
             outerRadius = option.outerRadius || Math.min(width/2, height/2),
-            innerRadius = option.innerRadius || outerRadius * 0.4,
-            numPartition = option.numPartition || 3;
+            innerRadius = option.innerRadius || outerRadius * (1 - Math.pow(structs.length, 0.8) / 5.5),
+            numPartition = option.numPartition || structs[0].numPartition || 3,
+            compareMode = option.compare || false,
+            hover = option.hover || function(d) {console.log("hover circular view: ", d);};
+
+        outerRadius -= padding;
+        if(Array.isArray(numPartition)) numPartition = numPartition.length;
 
         var matrix = data.map(function(d){
             // return d.busytimes;
             // return d.traffics;
-
-            return structs[0].vmap.hasOwnProperty("size") ? d[structs[0].vmap.size] : d.counts;
-            //
+            var values;
+            values = (structs[0].vmap.hasOwnProperty("size")) ? d[structs[0].vmap.size] : d[structs[0].vmap.color.split("_")[0]+"_count"];
+            return values;
         });
 
         var chord = d3.layout.chord()
-            .padding(0.8/numPartition)
+            .padding(0.05)
             .sortSubgroups(d3.descending)
             .matrix(matrix);
-
-        var values = [];
-        data.forEach(function(d){
-            values = values.concat(d[structs[0].vmap.color]);
-        });
-
-        var colorScale = d3.scale.linear().domain([ d3.min(values), d3.max(values) ]).range(structs[0].colors);
-
-        var svg = d3.select("#"+container).append("svg")
-            .attr("width", width)
-            .attr("height", height)
-          .append("g")
-            .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
 
         function coord(r, d){
             return [
@@ -64,7 +58,75 @@ define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
             return result;
         }
 
-        var routers = [], vectorSet = [], terminals = [];
+        function updateDomain(d1, d2) {
+            var d = d1;
+            if(typeof(d2) != 'undefined') {
+                if(d2.max > d.max) d.max = d2.max;
+                if(d2.min < d.min) d.min = d2.min;
+            }
+            return d;
+        }
+
+
+        var values = [];
+        data.forEach(function(d){
+            values = values.concat(d[structs[0].vmap.color]);
+        });
+
+        var colorDomain = {min: d3.min(values), max: d3.max(values) };
+
+        if(compareMode) {
+            if(!structs[0].hasOwnProperty("domains")){
+                structs[0].domains = {};
+                structs[0].domains[structs[0].vmap.color] = {};
+            }
+            colorDomain = updateDomain(colorDomain, structs[0].domains[structs[0].vmap.color]);
+            structs[0].domains[structs[0].vmap.color].min = colorDomain.min;
+            structs[0].domains[structs[0].vmap.color].max = colorDomain.max;
+        }
+
+        function linearDomain(domain, n){
+            var step = (domain[1] - domain[0])/n,
+                res = [];
+            for(var i = domain[0]; i<domain[1]; i+=step) {
+                res.push(i);
+            }
+
+            res.push(domain[1]);
+            return res;
+        }
+
+        var holdFade = false;
+        function fade(opacity) {
+          return function(g, i) {
+            if(!holdFade)
+            svg.selectAll(".chord path")
+                .filter(function(d) { return d.source.index != i && d.target.index != i; })
+              .transition()
+                .style("opacity", opacity);
+          };
+        }
+
+        var colorScale = d3.scale.linear().domain(linearDomain([colorDomain.min, colorDomain.max], structs[0].colors.length)).range(structs[0].colors);
+
+        if(typeof(structs[0].colorLegend) !== "undefined") structs[0].colorLegend.update([colorDomain.min, colorDomain.max], structs[0].colors);
+
+        var svg = d3.select(container).append("svg")
+            .attr("width", width)
+            .attr("height", height)
+          .append("g")
+            .attr("transform", "translate(" + (width / 2 + padding) + "," + (height / 2 + padding) + ")");
+
+        svg.append("g").selectAll("path")
+            .data(chord.groups)
+          .enter().append("path")
+            .style("fill", "transparent")
+            .style("stroke", "none")
+            .attr("d", d3.svg.arc().innerRadius(innerRadius).outerRadius(outerRadius))
+            .on("mouseover", fade(0.1))
+            .on("mouseout", fade(1))
+            .on("click", function(){holdFade=true;})
+            .on("dblclick", function(){holdFade=false;});
 
         structs.slice(1).forEach(function(s){
             s.data = [];
@@ -72,23 +134,48 @@ define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
         var chordGroups = chord.groups();
         chordGroups.forEach(function(d, di){
 
-
             structs.slice(1).forEach(function(s){
                 if(s.entity == "router"){
                     if(s.aggregate){
-                        var entry = {};
-                        Object.keys(s.vmap).forEach(function(m){
-                            entry[s.vmap[m]] = vectorSum(data[d.index].data.map(function(a){return a[s.vmap[m]];}));
+
+                        var entries = pipeline().group({
+                            $by: 'router_rank',
+                            router_id: "$addToSet",
+                            total_global_traffic: "$sum",
+                            total_global_busy_time: "$sum",
+                            total_local_traffic: "$sum",
+                            total_local_busy_time: "$sum",
+                            group_id: "$addToArray"
+                        }).sortBy({router_rank: 1})(data[d.index].data);
+
+                        var delta = (d.endAngle - d.startAngle ) / entries.length;
+                        entries.forEach(function(td, ti){
+                            var start =  d.startAngle + ti*delta;
+                            td.startAngle = start;
+                            td.endAngle = start + delta;
+                            td.pid = d.index;
+                            td.global_traffic = td.total_global_traffic;
+                            td.global_busy_time = td.total_global_busy_time;
+                            td.local_traffic = td.total_local_traffic;
+                            td.local_busy_time = td.total_local_busy_time;
                         });
-                        var delta = (d.endAngle - d.startAngle ) / entry[Object.keys(entry)[0]].length;
-                        entry[Object.keys(entry)[0]].forEach(function(e, ei){
-                            var start =  d.startAngle + ei*delta;
-                            var col = {startAngle: start, endAngle: start + delta, index: ei, pid: d.index};
-                            Object.keys(s.vmap).forEach(function(m){
-                                col[s.vmap[m]] = entry[s.vmap[m]][ei];
-                            });
-                            s.data.push(col);
-                        });
+
+                        s.data = s.data.concat(entries);
+                        //aggregate router by link/port (maybe we don't need it anymore)
+                        // var entry = {};
+                        // Object.keys(s.vmap).forEach(function(m){
+                        //     entry[s.vmap[m]] = vectorSum(data[d.index].data.map(function(a){return a[s.vmap[m]];}));
+                        // });
+                        // var delta = (d.endAngle - d.startAngle ) / entry[Object.keys(entry)[0]].length;
+                        // entry[Object.keys(entry)[0]].forEach(function(e, ei){
+                        //     var start =  d.startAngle + ei*delta;
+                        //     var col = {startAngle: start, endAngle: start + delta, index: ei, pid: d.index};
+                        //     Object.keys(s.vmap).forEach(function(m){
+                        //         col[s.vmap[m]] = entry[s.vmap[m]][ei];
+                        //     });
+                        //     s.data.push(col);
+                        // });
+
 
                     } else {
                         var delta = (d.endAngle - d.startAngle ) / data[d.index].data.length;
@@ -103,15 +190,45 @@ define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
                         });
                     }
 
+                } else if(s.entity == "global_link" || s.entity == "local_link") {
+                    if(s.aggregate) {
+                        var entries = pipeline().group({
+                            $by: "port",
+                            busy_time: "$sum",
+                            traffic: "$sum",
+                            router_id: "$addToSet"
+                        }).sortBy({port: 1})(data[d.index][s.entity+"s"]);
+
+                        var delta = (d.endAngle - d.startAngle ) / entries.length;
+
+                        entries.forEach(function(td, ti){
+                            var start =  d.startAngle + ti*delta;
+                            td.startAngle = start;
+                            td.endAngle = start + delta;
+                            td.pid = d.index;
+                        });
+                        s.data = s.data.concat(entries);
+                    } else {
+                        var delta = (d.endAngle - d.startAngle ) / data[d.index][s.entity+"s"].length;
+                        data[d.index][s.entity+"s"].forEach(function(td, ti){
+                            var start =  d.startAngle + ti*delta;
+                            td.startAngle = start;
+                            td.endAngle = start + delta;
+                            td.pid = d.index;
+                        });
+                        s.data = s.data.concat(data[d.index][s.entity+"s"]);
+                    }
                 } else {
                     if(s.aggregate) {
                         var entries = pipeline().group({
-                            $by: ['router_rank', 'router_port'],
+                            $by: s.aggregate,
+                            terminal_id: "$addToSet",
                             avg_hops: "$avg",
-                            busy_time: "$avg",
-                            data_size: "$avg",
-                            packets_finished: "$avg",
-                            avg_packet_latency: "$avg"
+                            busy_time: "$sum",
+                            data_size: "$sum",
+                            packets_finished: "$sum",
+                            avg_packet_latency: "$avg",
+                            workload: "$first"
                         }).sortBy({router_rank: 1, router_port: 1})(data[d.index].terminals);
                         var delta = (d.endAngle - d.startAngle ) / entries.length;
 
@@ -140,6 +257,14 @@ define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
             });
         });
 
+        // svg.selectAll(".cirBase")
+        //       .data([{index: 0, startAngle: 0, endAngle: 2*Math.PI}])
+        //     .enter()
+        //     .append("path")
+        //       .style("fill", "#eee")
+        //       .style("stroke", "#ccc")
+        //       .attr("d", d3.svg.arc().innerRadius(innerRadius).outerRadius(outerRadius))
+        //
 
         svg.append("g")
             .attr("class", "chord")
@@ -147,41 +272,124 @@ define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
             .data(chord.chords)
           .enter().append("path")
             .attr("d", d3.svg.chord().radius(innerRadius))
+            .attr("fillColor", function(d){return colorScale(data[d.source.index][structs[0].vmap.color][d.target.index]); })
             // .style("fill", function(d) { return fill(d.target.index); })
             .style("fill", function(d){return colorScale(data[d.source.index][structs[0].vmap.color][d.target.index]); })
             .style("stroke", function(d){return colorScale(data[d.source.index][structs[0].vmap.color][d.target.index]); })
-            .style("opacity", 1);
+            .style("opacity", 1)
+            .on("click", function(d){console.log(d);
+                var groups = data[d.source.index].data.map(function(g){
+                    return g.group_id;
+                });
+                hover(groups);
 
-        var cirRange = outerRadius - innerRadius,
-            cirSize = structs.slice(1).map(function(s){ return s.size; }).reduce(function(a,b){return a+b;}),
+                    svg.selectAll(".chord path")
+                        .filter(function(a) { return a.source.index == d.source.index && d.target.index == a.target.index; })
+                      .transition()
+                        .style("fill", "yellow");
+
+            });
+            svg.append("g").selectAll("base")
+                .data(chord.groups)
+                .enter()
+                .append("path")
+                  .style("fill", "#555")
+                  .style("stroke", "#aaa")
+                  .style("opacity", 1.0)
+                  .attr("d", d3.svg.arc().innerRadius(innerRadius-5).outerRadius(innerRadius))
+
+
+        var cirRange = outerRadius - innerRadius - padding,
+            cirSize = structs.slice(1).map(function(s){ return Object.keys(s.vmap).length; }).reduce(function(a,b){return a+b;}),
             cirOffset = innerRadius;
 
-        structs.slice(1).forEach(function(s){
-            var sectionRadiusRange =  cirOffset + s.size / cirSize * cirRange,
+        structs.slice(1).forEach(function(s, sti){
+            var sectionRadiusRange =  cirOffset + Object.keys(s.vmap).length / cirSize * cirRange,
                 cirPadding = 0.05 * sectionRadiusRange,
                 sectionRadius = 0.95 * sectionRadiusRange,
                 getSize = function() { return (sectionRadius); },
+                getOpacity = function() { return 1; },
                 getColor = function() { return s.colors[0]; },
-                stats = p4.stats(s.data, Object.keys(s.vmap).map(function(k){
+                numericAttr = Object.keys(s.vmap).map(function(k){
                     return (!s.aggregate && s.entity=="router" ) ? "total_" + s.vmap[k] : s.vmap[k];
-                }));
-            console.log(cirRange, cirOffset, sectionRadius);
+                }).filter(function(k){return (k!="workload")}),
+                stats = p4Stats(s.data, numericAttr);
+
+            function highlight(d) {
+
+                var terminalIDs;
+
+                if(s.entity == 'router') {
+                    terminalIDs = pipeline().match({router_id: {$in: d.router_id}})(data[d.pid].terminals).map(function(t){return t.terminal_id});
+                } else {
+                    terminalIDs = pipeline().match({router_port: d.pid})(data[d.pid].terminals).map(function(t){return t.terminal_id});
+                }
+
+                hover({
+                    group: d.group_id,
+                    router: d.router_id,
+                    node: terminalIDs
+                });
+                // console.log(d.group_id, d.router_id);
+                d3.select(this)
+                    .style("stroke-width", 3)
+                    .style("stroke", "yellow");
+            }
+
+            function unhighlight(d) {
+                d3.select(this)
+                    .style("stroke-width", 1)
+                    .style("stroke", "#fff");
+            }
+
+            if(compareMode) {
+                if(!s.hasOwnProperty("domains")) s.domains = {};
+                Object.keys(stats).forEach(function(k, ki){
+
+                    stats[k] = updateDomain(stats[k], s.domains[k]);
+                    if(!s.domains.hasOwnProperty(k)) s.domains[k] = {};
+                    s.domains[k].min = stats[k].min;
+                    s.domains[k].max = stats[k].max;
+
+                });
+            }
+
             // console.log(s.data, stats);
             if("size" in s.vmap) {
                 var sizeAttr = (!s.aggregate && s.entity=="router" ) ? "total_" + s.vmap.size : s.vmap.size;
                 if(stats[sizeAttr].max == stats[sizeAttr].min) stats[sizeAttr].max+=0.000001;
-                getSize = d3.scale.linear()
+                getSize = d3.scale.pow().exponent(0.9)
                     .domain([stats[sizeAttr].min, stats[sizeAttr].max])
                     .range([cirOffset, sectionRadius]);
             }
 
             if("color" in s.vmap) {
                 var colorAttr = (!s.aggregate && s.entity=="router" ) ?  "total_" + s.vmap.color : s.vmap.color;
-                if(stats[colorAttr].max == stats[colorAttr].min) stats[colorAttr].max+=0.000001;
-                getColor =  d3.scale.linear()
-                    .domain([stats[colorAttr].min, stats[colorAttr].max])
+                if(typeof(s.colors) === "function") {
+                    getColor = s.colors;
+                } else {
+                    if(stats[colorAttr].max == stats[colorAttr].min) stats[colorAttr].max+=0.000001;
+                    getColor =  d3.scale.linear()
+                    .domain(linearDomain([stats[colorAttr].min, stats[colorAttr].max], s.colors.length))
                     .range(s.colors);
+                }
+
+                if(s.hasOwnProperty("colorLegend") && stats.hasOwnProperty(colorAttr))
+                    s.colorLegend.update([stats[colorAttr].min, stats[colorAttr].max], s.colors);
             }
+
+            if("opacity" in s.vmap) {
+                var opacityAttr = (!s.aggregate && s.entity=="router" ) ?  "total_" + s.vmap.opacity : s.vmap.opacity;
+
+                if(stats[opacityAttr].max == stats[opacityAttr].min) stats[opacityAttr].max+=0.000001;
+                getOpacity =  d3.scale.linear()
+                .domain([stats[opacityAttr].min, stats[opacityAttr].max])
+                .range([0.2,1]);
+
+
+                // s.opacityLegend.update([stats[colorAttr].min, stats[colorAttr].max], s.colors);
+            }
+
 
             if("x" in s.vmap && "y" in s.vmap){
                 var xAttr = (!s.aggregate && s.entity=="router" ) ?  "total_" + s.vmap.x : s.vmap.x,
@@ -189,13 +397,13 @@ define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
 
                 getSize = d3.scale.linear()
                     .domain([stats[sizeAttr].min, stats[sizeAttr].max])
-                    .range([0.5, 5]);
+                    .range([2, (sectionRadius - cirOffset)/15]);
 
                 var domainX = [stats[xAttr].min, stats[xAttr].max],
                     domainY = [stats[yAttr].min, stats[yAttr].max];
 
                 var radiusDiff = sectionRadius - cirOffset,
-                    paddingY = radiusDiff * 0.04;
+                    paddingY = radiusDiff * 0.1;
 
                 var getPosY = d3.scale.linear()
                     .domain(domainY)
@@ -203,7 +411,7 @@ define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
 
                 s.data.forEach(function(d, di){
                     var angleRange = chordGroups[d.pid].endAngle - chordGroups[d.pid].startAngle,
-                        paddingX = 0.04 * angleRange;
+                        paddingX = 0.1 * angleRange;
 
                     var getPosX = d3.scale.linear()
                         .domain(domainX)
@@ -213,6 +421,7 @@ define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
 
                     d.cx = pos[0];
                     d.cy = pos[1];
+
                 });
 
                 svg.selectAll(".dot")
@@ -223,23 +432,22 @@ define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
                       .attr("cx", function(d){return d.cx})
                       .attr("cy",function(d){return d.cy})
                       .style("fill", function(d){return getColor(d[colorAttr])})
-                      .style("fill-opacity", 0.5);
+                      .style("fill-opacity", function(d){return getOpacity(d[opacityAttr])});
 
                 var group = svg.append("g").selectAll("path")
                   .data(chord.groups)
                 .enter().append("g");
 
-                group.append("path")
-                  .style("fill", "transparent")
-                  .style("stroke", "#aaa")
-                  .attr("d", d3.svg.arc().innerRadius(cirOffset).outerRadius(sectionRadius))
-                  .on("click", fade(0.1))
-                  .on("mouseout", fade(1));
+                if(s.border || s.axis || true){
+                    group.append("path")
+                      .style("fill", "transparent")
+                      .style("stroke", "#aaa")
+                      .attr("d", d3.svg.arc().innerRadius(cirOffset).outerRadius(sectionRadius));
+                }
 
-
-                if(s.border) {
+                if(s.axis) {
                     var groupTick = group.selectAll(".group-tick")
-                        .data(function(d) { console.log(groupTicks(d, domainX)); return groupTicks(d, domainX); })
+                        .data(function(d) { return angularTicks(d, domainX); })
                         .enter().append("g")
                           .attr("class", "group-tick")
                           .attr("transform", function(d) { return "rotate(" + (d.angle * 180 / Math.PI - 90) + ") translate(" + sectionRadius + ",0)"; });
@@ -255,10 +463,10 @@ define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
                       .attr("transform", function(d) { return d.angle > Math.PI ? "rotate(180) translate(-16)" : null; })
                       .style("text-anchor", function(d) { return d.angle > Math.PI ? "end" : null; })
                       .style("font-size", ".65em")
-                      .text(function(d) { return p4.io.printformat(".2s")(d.value); });
+                      .text(function(d) { return printformat(".2s")(d.value); });
 
                     // Returns an array of tick angles and values for a given group and step.
-                    function groupTicks(d, domain) {
+                    function angularTicks(d, domain) {
                         var range = domain[1] - domain[0];
                         // if(domain[1] === domain[0]) {
                         //     domain[0] -= 0.01;
@@ -270,7 +478,7 @@ define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
                         var k = (d.endAngle - d.startAngle) * 0.90 / range,
                             step = Math.ceil((domain[1] - domain[0]) / (20/Math.pow(numPartition,0.5)));
 
-                        console.log(range, step, d3.range(0, range, step));
+                        range += k * range;
                         // if(step <= 0) step =  Math.floor((domain[1] - domain[0]) /2 );
                         return d3.range(0, range, step).map(function(value) {
                             return {value: value, angle: value * k + d.startAngle + (d.endAngle - d.startAngle) * 0.05};
@@ -283,7 +491,10 @@ define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
                   .enter().append("path")
                     .style("fill", function(d) { return getColor(d[colorAttr]); })
                     .style("stroke", function(d) { return getColor(d[colorAttr]); })
-                    .attr("d",function(d) { return d3.svg.arc().innerRadius(cirOffset).outerRadius(getSize(d[sizeAttr]))(d) });
+                    .attr("d",function(d) { return d3.svg.arc().innerRadius(cirOffset).outerRadius(getSize(d[sizeAttr]))(d) })
+                        .on("mouseover", highlight)
+                        .on("mouseout", unhighlight);;
+
 
                 if(s.aggregate) {
                     visualElement
@@ -294,24 +505,40 @@ define(["p4/core/pipeline", "d3"], function(pipeline, d3) {
             cirOffset = sectionRadius + cirPadding;
         });
 
-        svg.append("g").selectAll("path")
-            .data(chord.groups)
-          .enter().append("path")
-            .style("fill", "transparent")
-            .style("stroke", "none")
-            .attr("d", d3.svg.arc().innerRadius(innerRadius).outerRadius(innerRadius+20))
-            .on("mouseover", fade(0.1))
-            .on("mouseout", fade(1));
 
-        // Returns an event handler for fading a given chord group.
-        function fade(opacity) {
-          return function(g, i) {
-            svg.selectAll(".chord path")
-                .filter(function(d) { return d.source.index != i && d.target.index != i; })
-              .transition()
-                .style("opacity", opacity);
-          };
+
+        if(structs[0].groupLabel){
+            var groupMarks = [];
+            chordGroups.forEach(function(g, gi){
+                var paVals = data[g.index].data.map(function(gd){ return gd[structs[0].partitionAttr]});
+                var minVal = d3.min(paVals),
+                    maxVal = d3.max(paVals);
+
+                // groupMarks[gi] = structs[0].partitionAttr + "(" + minVal + "-" + maxVal + ")";
+                groupMarks[gi] = printformat(".2s")(minVal) + " - " + printformat(".2s")(maxVal);
+
+                if(structs[0].partitionAttr == "router_rank") {
+                    groupMarks[gi] = "router"  + maxVal;
+                } else if(structs[0].partitionAttr == "group_id" && maxVal == minVal) {
+                    groupMarks[gi] = maxVal;
+                } else if(structs[0].partitionAttr == "workload") {
+                    groupMarks[gi] = data[g.index].name;
+                }
+            })
+
+            var groupLabel = svg.append("g").selectAll("groupLabel")
+                    .data(chord.groups)
+                  .enter().append("g")
+                  .attr("transform", function(d) {return "rotate(" + ((d.startAngle + (d.endAngle - d.startAngle)/2) * 180 / Math.PI - 90) + ")translate(" + (outerRadius-padding) + ",0)";;});
+
+            groupLabel.append("text")
+            .attr("dy", ".35em")
+            .style("font-size", "16px")
+            .style("text-anchor", "middle")
+            .attr("transform", function(d) { return (d.startAngle + (d.endAngle - d.startAngle)/2) > Math.PI/2 &&  (d.startAngle + (d.endAngle - d.startAngle)/2) < 1.5 * Math.PI ? "rotate(270)" :"rotate(90)"; })
+                    .text(function(d) { return groupMarks[d.index];});
         }
+
     }
 
 });

@@ -120,24 +120,29 @@ function mmtsPlot(arg){
         svg.appendChild(layer);
     }
 
-    mmts.highlight = function(rank, rankPerGroup, color){
-        var nodePerGroup = rankPerGroup || 1;
+    mmts.highlight = function(ranks, color){
+        if(!Array.isArray(ranks)) ranks = [ranks];
+
         webgl.uniform.u_color = defaultColor;
         for(var ii = 0, l = mmts.data[vmap.y].length; ii < l; ii += mmts.timesteps){
-             if(Math.floor(i / nodePerGroup) != rank) gl.drawArrays(gl.LINE_STRIP, ii, mmts.timesteps);
+            if(ranks.indexOf(ii)===-1)
+                gl.drawArrays(gl.LINE_STRIP, ii, mmts.timesteps);
         }
 
-        var a = (nodePerGroup === 1) ? 1.0 : 0.5;
+        var a =  1.0 ;
 
         var hColor = color || [a, a, 0, a];
         webgl.uniform.u_color = hColor;
         // webgl.uniform.nodePerGroup = nodePerGroup;
         // webgl.uniform.highlight = 1;
         var lineTotal = mmts.data[vmap.y].length /  mmts.timesteps;
-        // console.log(mmts.timesteps, lineTotal);
-        for(var i = 0; i < lineTotal; i++){
-            if(Math.floor(i / nodePerGroup) == rank) gl.drawArrays(gl.LINE_STRIP, i*mmts.timesteps, mmts.timesteps);
-        }
+            // console.log(mmts.timesteps, lineTotal);
+
+        ranks.forEach(function(rank){
+            gl.drawArrays(gl.LINE_STRIP, rank*mmts.timesteps, mmts.timesteps);
+        })
+
+
     }
 
     mmts.render = function(){

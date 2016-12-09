@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="../../favicon.ico"> -->
+    <title>CODES VIS</title>
+    <link href="npm/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="npm/bootstrap-slider/dist/css/bootstrap-slider.min.css" rel="stylesheet">
+    <link href="npm/bootstrap-colorpicker/dist/css/bootstrap-colorpicker.min.css" rel="stylesheet">
+    <link href="style/style.css" rel="stylesheet">
+    <!-- <link href="style/app.css" rel="stylesheet"> -->
+    <style>
+        .chord path {
+          fill-opacity: .67;
+          stroke: #000;
+          stroke-width: .5px;
+        }
+        .form-control-label {
+            text-align: right;
+            vertical-align: middle;
+        }
+        .group-tick line {
+          stroke: #000;
+        }
+    </style>
+  </head>
+  <body>
+    <div style="padding: 20px">
+        <div class="row">
+            <div class="col-md-5">
+                <div style="background-color: #DDD; padding: 20px;">
+                    <!-- <div class="form-group">
+                        <input type="radio"  name="inlineRadioOptions" id="inlineRadio1" value="option1"><strong>Grouping</strong>
+                    </div> -->
+                    <form>
+                        <div class="form-group row">
+                            <label class="col-sm-3 form-control-label" for="datasetSelect">Data Sets:</label>
+                            <div class="col-sm-9">
+                                <select class="form-control" id="datasetSelect">
+
+                                </select>
+                            </div>
+                        </div>
+                      <div class="form-group row">
+                          <label class="col-sm-3 form-control-label" for="aggregateDataBy">Aggregate By:</label>
+                          <div class="col-sm-9">
+                              <select class="form-control" id="aggregateDataBy">
+                                <option>Group Id</option>
+                                <option>Router Rank</option>
+                                <option>Total Global Busy Time</option>
+                                <option>Total Global Traffic</option>
+                                <option>Total Local Busy Time</option>
+                                <option>Total Local Traffic</option>
+                              </select>
+                          </div>
+                      </div>
+                      <div class="form-group row">
+                        <label class="col-sm-3 form-control-label" for="numberOfPartition" >Number of Partitions: </label>
+                        <div class="col-sm-9">
+                            <input id="numberOfPartition" type="text" />
+                         (<span id="numberOfPartitionVal">3</span>)
+                        </div>
+                      </div>
+
+                      <!-- <div class="form-group row">
+                          <label class="col-sm-3 form-control-label" for="aggregateDataBy">Size Encoding:</label>
+                          <div class="col-sm-9">
+                              <select class="form-control" id="visualMapSize">
+                                <option>Total Global Busy Time</option>
+                                <option>Total Global Traffic</option>
+                                <option>Total Local Busy Time</option>
+                                <option>Total Local Traffic</option>
+                              </select>
+                          </div>
+                      </div>
+
+                      <div class="form-group row">
+                          <label class="col-sm-3 form-control-label" for="filterSizeAttr"  >Filtering: </label>
+                          <div class="col-sm-9">
+                              <input id="filterSizeAttr" type="text" />
+                              <span style="margin-left: 10px" id="filterSizeAttrMin">0%</span> ~ <span id="filterSizeAttrMax">100%</span>
+                          </div>
+                      </div>
+
+                      <div class="form-group row">
+                          <label class="col-sm-3 form-control-label" for="aggregateDataBy">Color Encoding:</label>
+                          <div class="col-sm-9">
+                              <select class="form-control" id="visualMapSize">
+                                <option>Total Global Busy Time</option>
+                                <option>Total Global Traffic</option>
+                                <option>Total Local Busy Time</option>
+                                <option>Total Local Traffic</option>
+                              </select>
+                          </div>
+                      </div>
+
+                      <div class="form-group row">
+                          <label class="col-sm-3 form-control-label" for="filterColorAttr">Filtering: </label>
+                          <div class="col-sm-9">
+                              <input id="filterColorAttr" type="text" />
+                              <span style="margin-left: 10px" id="filterColorAttrMin">0%</span> ~ <span id="filterColorAttrMax">100%</span>
+                          </div>
+                      </div> -->
+                    </form>
+
+                </div>
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th class="col-md-1"></th>
+                      <th class="col-md-1">Entity</th>
+                      <th class="col-md-4">Visual Encoding</th>
+                      <th class="col-md-4">Color Mapping</th>
+                      <th class="col-md-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="networkViewSetting"> </tbody>
+                </table>
+                <form class="form-inline" style="text-align: right;">
+                  <div class="form-group">
+                      <select class="form-control" id="entityNewRow">
+                        <option>router</option>
+                        <option>terminal</option>
+                        <option>global_link</option>
+                        <option>terminal_link</option>
+                      </select>
+                  </div>
+                  <button type="button" class="btn btn-primary" id="addStructRow">Add Layer</button>
+                  <div class="form-group">
+                      <label for="newConfiguration"></label>
+                      <input type="text" class="form-control" id="newConfiguration" placeholder="name for this new configuration">
+                  </div>
+                  <button type="button" class="btn btn-success" id="saveConfiguration">Save Setting</button>
+                </form>
+                <div>
+                    <p>
+                        <select id="datasetsCompare" multiple style="margin-top: 20px; width: 100%; height: 100px;"></select>
+                    </p>
+                    <p>
+                        <button type="button" class="btn btn-success" id="compareDataSets">Compare Datasets</button>
+                    </p>
+
+                </div>
+
+            </div>
+            <div class="col-md-7">
+                <div id="networkView"></div>
+                <div id="aggrNetworkView"></div>
+            </div>
+        </div>
+
+    </div>
+    <script src="npm/jquery/dist/jquery.min.js"></script>
+    <script src="npm/jqueryui/jquery-ui.min.js"></script>
+    <script src="npm/bootstrap/dist/js/bootstrap.min.js"></script>
+    <script src="npm/bootstrap-slider/dist/bootstrap-slider.min.js"></script>
+    <script src="npm/bootstrap-colorpicker/dist/js/bootstrap-colorpicker.min.js"></script>
+    <script src="jam/require.js"></script>
+    <script src="lib/i2v.js"></script>
+    <script src="lib/p4.js"></script>
+    <script>
+        require([
+            "p4/io/ajax",
+            "p4/io/parser",
+            "p4/core/datastruct",
+            "p4/core/pipeline",
+            "js/colorLegend",
+            'vui/dropdown',
+            'model/dragonfly',
+            "js/hierCircles"
+        ], function(ajax, dsv, dataStruct, pipeline, colorLegend,DropDownMenu, Dragonfly, hierCircles) {
+            var NUM_ROUTER,
+                NUM_GROUP,
+                TERMINAL_PER_ROUTER,
+                ROUTER_PER_GROUP,
+                TERMINAL_PER_GROUP,
+                GLOBAL_LINK;
+
+            var cache,
+                dataSetID = 0,
+                visualizeData = function(){},
+                partitionAttr = "group_id",
+                numPartition = 11,
+                compareMode = false;
+
+            var colorLegends = [];
+
+            function viz(option) {
+                option.structs = structs;
+                option.numPartition = numPartition;
+                $(option.container).html("");
+                hierCircles(option);
+            }
+
+            groupSlider = new Slider("#numberOfPartition", {
+                min: 2,
+                max: 33,
+                value: numPartition
+            });
+
+            // ["#filterSizeAttr", "#filterColorAttr"].forEach(function(filterAttr){
+            //     var slider = new Slider(filterAttr, {
+            //         min: 0,
+            //         max: 1,
+            //         step: 0.01,
+            //         range: true,
+            //         tooltip: "hide",
+            //         id: "slider"+filterAttr.slice(1),
+            //         value: [0.0, 1.0]
+            //     });
+            //
+            //     $(filterAttr).on("change", function(slider){
+            //         $(filterAttr+"Min").text((slider.value.newValue[0]*100).toFixed(0)+"%");
+            //         $(filterAttr+"Max").text((slider.value.newValue[1]*100).toFixed(0)+"%");
+            //     });
+            //
+            //     $("#slider" + filterAttr.slice(1) + " .slider-selection").css({background: "steelblue"});
+            // })
+
+            var structs = [
+                {
+                    entity: "router",
+                    level: "router",
+                    vmap: {color: "global_traffic"},
+                    type: 'links',
+                    size: 0,
+                    groupLabel: true,
+                    partitionAttr: partitionAttr,
+                    numPartition: numPartition,
+                    // colors: ["white", "#cc5500"]
+                    colors: i2v.colors("Oranges").colors
+                },
+                {
+                    entity: "router",
+                    level: "router",
+                    vmap: {
+                        color: "global_busy_time",
+                        // size: "global_traffic"
+                    },
+                    aggregate: "router_id",
+                    type: 'bar',
+                    colors: ['green', 'yellow'],
+                    size: 1,
+                },
+                {
+                    entity: "router",
+                    level: "router",
+                    vmap: {color: "local_busy_time", size: "local_traffic"},
+                    aggregate: "router_id",
+                    type: 'bar',
+                    colors: ['steelblue', '#E00'],
+                    size: 1,
+                },
+                {
+                    entity: "terminal",
+                    level: "router",
+                    vmap: {size: "avg_hops", color: "avg_packet_latency", x: "router_rank", y: "router_port"},
+                    size: 1.5,
+                    type: 'bar',
+                    colors: ['white', 'purple'],
+                    aggregate: "router_id",
+                    aggregate: true
+                },
+                // {
+                //     entity: "global_link",
+                //     level: "group",
+                //     vmap: {color: "busy_time", size: "data_size"},
+                //     size: 1.5,
+                //     type: 'bar',
+                //     aggregate: true,
+                //     // colors: linearColor("PiYG").reverse(),
+                //     colors: ["white", "purple"],
+                //     border: 1,
+                //     // axis: 1,
+                // },
+
+            ];
+
+            // var structs = [
+            //     {
+            //         entity: "router",
+            //         level: "router",
+            //         vmap: {color: "local_traffic"},
+            //         type: 'links',
+            //         size: 0,
+            //         groupLabel: true,
+            //         partitionAttr: partitionAttr,
+            //         numPartition: numPartition,
+            //         // colors: ["white", "#cc5500"]
+            //         colors: i2v.colors("Oranges").colors
+            //     },
+            //     {
+            //         entity: "local_link",
+            //         level: "router",
+            //         vmap: {
+            //             color: "busy_time",
+            //             // size: "global_traffic"
+            //         },
+            //         aggregate: "router_id",
+            //         type: 'bar',
+            //         colors: ['green', 'yellow'],
+            //         size: 1,
+            //     },
+            //     {
+            //         entity: "global_link",
+            //         vmap: {color: "busy_time",},
+            //         aggregate: "router_id",
+            //         type: 'bar',
+            //         colors: ['steelblue', '#E00'],
+            //         size: 1,
+            //     },
+            //     {
+            //         entity: "terminal",
+            //         vmap: {color: "avg_packet_latency"},
+            //         size: 1,
+            //         type: 'bar',
+            //         colors: ['white', 'purple'],
+            //         aggregate: "router_id",
+            //         aggregate: true
+            //     },
+            // ];
+
+            function _update(value){
+                numPartition = value;
+                visualizeData(cache);
+            }
+
+            $("#aggregateDataBy").on("change", function(d){
+                partitionAttr = $(this).val().toLowerCase().split(" ").join("_");
+                visualizeData(cache);
+                structs[0].partitionAttr = partitionAttr;
+                // if(partitionAttr  == "router_rank") {
+                    // $("#numberOfPartition").hide();
+                // }
+            })
+
+            function linearColor(c) {
+                var colors = i2v.colors(c).colors;
+                return [colors[1], colors[colors.length-1]];
+            }
+
+            var entities = ["terminal","router", "global_link", "local_link"],
+                granularities = ["group", "router", "node/port"];
+
+            var metadata = {
+                router: {
+                    group: ["local_busy_time", "global_busy_time", "local_traffic", "global_traffic"],
+                    router: ["router_rank", "local_busy_time", "global_busy_time", "local_traffic", "global_traffic"],
+                    node: ["type", "busytime", "traffic"]
+                },
+                terminal: {
+                    group: ["router_port", "router_rank", "data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time"],
+                    router: ["router_port", "router_rank", "data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time"],
+                    node: ["router_port", "router_rank", "data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time"]
+                },
+            };
+
+            var entityAttributes = {
+                router: ["local_busy_time", "global_busy_time", "local_traffic", "global_traffic"],
+                terminal: ["router_port", "router_rank", "data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time"],
+                global_link: ["traffic", "busy_time"],
+                local_link: ["traffic", "busy_time"]
+            }
+
+            var dataStore = {
+                router: {group: [], router: [], node: []},
+                terminal: {group: [], router: [], node: []}
+            };
+
+            var defaultVMAP = {
+                router: {color: "global_busy_time", size: "global_traffic"},
+                terminal: {color: "avg_packet_latency", size: "avg_hops", x: "router_rank", y: "router_port"},
+                local_link: {color: "busy_time", size: "traffic"},
+                global_link: {color: "busy_time", size: "traffic"}
+            }
+
+            $("#addStructRow").on("click", function(){
+                var entity = $("#entityNewRow").val();
+
+                structs.push({
+                    entity: entity,
+                    aggregate: true,
+                    vmap: defaultVMAP[entity],
+                    colors: ['steelblue', '#E00']
+                });
+
+                vmapUI(structs);
+                visualizeData(cache)
+            });
+
+
+            function vmapUI(structs) {
+                $("#networkViewSetting").html("");
+                structs.forEach(function(struct, si){
+                    var tr = $("<tr/>"), td = $("<td/>");
+
+                    var attributes = getAttr(struct.entity, struct.level),
+                        e = DropDownMenu({options: entities, selected: entities.indexOf(struct.entity)}),
+                        g = DropDownMenu({options: granularities, selected: granularities.indexOf(struct.level)}),
+                        vmapSelectors = [];
+
+                    var vmapLabel = {x: "Angular (x)", y: "Radial (y)", color: "Color", size: "Size"};
+                    ["color", "size", "x", "y"].forEach(function(a){
+                        var selector = DropDownMenu({float: "none", label: vmapLabel[a], options: attributes, selected: attributes.indexOf(struct.vmap[a])});
+
+                        selector.onchange = function(d) {
+                            if(d == '----') {
+                                delete struct.vmap[a];
+                            } else {
+                                struct.vmap[a] = d;
+                            }
+                            visualizeData(cache);
+                        }
+
+                        vmapSelectors.push(selector);
+                    });
+                    //
+                    if(si===0) {
+                        vmapSelectors.pop();
+                        vmapSelectors.pop();
+                        // e.changeOptions(["link"], 0)
+                    }
+
+                    e.onchange = function(_) {
+                        if(_=='----') return;
+                        struct.entity = _;
+                        vmapSelectors.forEach(function(sel){
+                            sel.changeOptions(getAttr(struct.entity), 0);
+                        });
+                        // struct.vmap = defaultVMAP[_];
+                        // visualizeData(cache);
+                    };
+
+                    g.onchange = function(_) {
+                        if(_=='----') return;
+                        if(_ == "node/port") _ = "node";
+                        struct.level = _;
+                        vmapSelectors.forEach(function(sel){
+                            sel.changeOptions(getAttr(struct.entity, struct.level), 0);
+                        });
+                    }
+                    var colorCol = $("<p/>");
+                    if('color' in struct.vmap) {
+                        var colorMap = colorLegend({width: 220, height: 20, colors: struct.colors, domain: [0, 1], padding: {left: 15, right: 15, top: 0, bottom: 25} }),
+                            colorPicks = [];
+
+                        struct.colorLegend = colorMap;
+
+                        [struct.colors[0], struct.colors[struct.colors.length-1]].forEach(function(c, ci){
+                            var colorPick = $("<a/>")
+                                .addClass("btn btn-default")
+                                .css({
+                                    width: "22px",
+                                    padding: 2,
+                                    marginRight: "10px"
+                                    // border: "none",
+                                })
+                                .append($("<span/>")
+                                    .addClass("input-group-addon")
+                                    .css({width: "16px", padding: 0})
+                                    .append("<i/>"));
+
+                            colorPick.colorpicker({color: c}).on("hidePicker", function(e){
+                                struct.colors[ci] = e.color.toHex();
+                                visualizeData(cache);
+                            });
+
+                            colorPicks.push(colorPick);
+                        })
+
+                        colorCol.append(colorPicks);
+                    }
+
+                    var aggrCheckBox = $("<input/>").attr("type", "checkbox");
+
+                    if(struct.aggregate) aggrCheckBox.attr("checked", "checked");
+
+                    aggrCheckBox.click(function(e){
+                        struct.aggregate = $(this).is(":checked") ? true : false;
+                        visualizeData(cache);
+                    })
+
+                    var rowLabel = $("<span/>")
+                        .text("")
+                        .attr("title", "remove")
+                        .css({cursor: "pointer"})
+                        .on("click", function() {
+                            structs.splice(si, 1);
+                            visualizeData(cache);
+                            tr.remove();
+                        });
+
+                    tr.append([
+                        $("<td/>").append(rowLabel),
+                        $("<td/>").append([ aggrCheckBox, $("<span/>").text("aggreate"), e ]),
+                        $("<td/>").append(vmapSelectors),
+                        $("<td/>").append(colorMap),
+                        $("<td/>").append(colorCol),
+                    ]);
+
+                    if(si) {
+                        tr.on("mouseover", function(e) {rowLabel.text("[ X ]")})
+                        .on("mouseout", function(e) { rowLabel.text("")});
+                    }
+
+                    $("#networkViewSetting").append(tr);
+                });
+            }
+
+
+            function loadData(dataset, containerID) {
+                var container = containerID || "#networkView",
+                    NUM_ROUTER = dataset.model.num_router,
+                    NUM_GROUP = dataset.model.num_group,
+                    TERMINAL_PER_ROUTER = dataset.model.numNode / NUM_ROUTER,
+                    ROUTER_PER_GROUP = NUM_ROUTER / NUM_GROUP,
+                    TERMINAL_PER_GROUP = TERMINAL_PER_ROUTER * ROUTER_PER_GROUP,
+                    GLOBAL_LINK = dataset.model.global_link;
+
+                cache = null;
+                // $("#networkViewSetting").html("");
+
+                ajax.getAll([
+                    {
+                        // url: "/uniformRandom/nonmin/dragonfly-router-stats",
+                        url: dataset.directory + "/" + dataset.results.summary.router_stats,
+                        dataType: "text"
+                    },
+                    {
+                        // url: "/uniformRandom/nonmin/dragonfly-router-traffic",
+                        url: dataset.directory + "/" + dataset.results.summary.router_traffic,
+                        dataType: "text"
+                    },
+                    {
+                        // url: "/uniformRandom/nonmin/dragonfly-msg-stats",
+                        url: dataset.directory + "/" + dataset.results.summary.terminal,
+                        dataType: "text"
+                    }
+                ]).then(function(text){
+                // console.log(text[0]);
+                    var busytime = dataStruct({
+                        array: dsv(text[0], " "),
+                        header: ["lp_id", "group_id", "router_id", "local_busy_time", "global_busy_time"],
+                        types: ["int", "int", "int", "veci"+ROUTER_PER_GROUP, "veci"+GLOBAL_LINK],
+                        skip: 2,
+                    }).objectArray();
+
+                    var traffic = dataStruct({
+                        array: dsv(text[1], " "),
+                        header: ["lp_id", "group_id", "router_id", "local_traffic", "global_traffic"],
+                        types: ["int", "int", "int", "veci"+ROUTER_PER_GROUP, "veci"+GLOBAL_LINK],
+                        skip: 2,
+                    }).objectArray();
+
+                    var terminals = dataStruct({
+                        array: dsv(text[2], " "),
+                        header: ["lp_id", "terminal_id", "data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time"],
+                        types: ["int", "int", "int", "float", "float", "float", "float"],
+                        skip: 1
+                    }).objectArray();
+
+                    data = Dragonfly({
+                        numRouter : dataset.model.num_router,
+                        numGroup  : dataset.model.num_group,
+                        numNode   : dataset.model.num_node,
+                        traffic: traffic,
+                        busytime: busytime,
+                        terminals: terminals
+                    });
+
+                    cache = data;
+                    console.log(data);
+                    // dataStore.router.group = pipeline().group({
+                    //     $by: "group_id",
+                    //     total_local_traffic: "$sum",
+                    //     total_local_busy_time: "$sum",
+                    //     total_global_traffic: "$sum",
+                    //     total_global_busy_time: "$sum"
+                    // })(dataStore.router.router);
+
+                    visualizeData = function (data){
+                        // circularView();
+                        var result = data.partition(partitionAttr, numPartition);
+                        console.log(result);
+                        viz({data: result, container: container, compare: compareMode, width: 720});
+                        // viz({data: result, container: "#networkView"});
+                    }
+
+                    visualizeData(cache);
+                });
+            }
+
+            if(compareMode) $("#networkViewSetting").html("");
+            function getAttr(e) {
+                var a = entityAttributes[e].filter(function(n){
+                    return (["timestamp", "rank", "port", "router_id", "group_id", "type"].indexOf(n)===-1);
+                })
+
+                return ['----'].concat(a);
+            }
+
+            vmapUI(structs);
+
+
+            ajax.get({
+                url: "/datasets",
+                dataType: "json"
+            }).then(function(datasets) {
+
+                var dataset = datasets[0];
+
+                $("#numberOfPartition").on("change", function(slider){
+                    // console.log(slider.value);
+                    _update(slider.value.newValue);
+                    $("#numberOfPartitionVal").text(slider.value.newValue);
+                    structs[0].numPartition = slider.value.newValue;
+                });
+
+                datasets.forEach(function(ds, dsi){
+                    $("#datasetSelect").append($("<option/>").attr("value", dsi).text(ds.directory));
+                    $("#datasetsCompare").append($("<option/>").attr("value", dsi).text(ds.directory))
+                })
+
+                $("#datasetSelect").on("change", function(evt){
+                    dataSetID = $("#datasetSelect").val();
+                    loadData(datasets[dataSetID]);
+                })
+
+                loadData(dataset);
+                $("#compareDataSets").click(function(e){
+
+                    $("#networkView").html("");
+                    compareMode = true;
+                    // for(var id = dataSetID; id < dataSetID+3; id++){
+                    //     var div = $("<div />").attr("id", "compareview"+id);
+                    //
+                    //     $("#networkView").append(div);
+                    //
+                    //     loadData(datasets[id], "#compareview"+id);
+                    // }
+
+                    $("#networkView").html("");
+                    // for(var id = dataSetID; id < dataSetID+3; id++){
+                    //     var div = $("<div />").attr("id", "compareview"+id);
+                    //
+                    //     $("#networkView").append(div);
+                    //
+                    //     loadData(datasets[id], "#compareview"+id);
+                    // }
+                    var comparingDatasets = $("#datasetsCompare").val().map(function(ds){return parseInt(ds);});
+                    comparingDatasets.forEach(function(id){
+                        var div = $("<div />").attr("id", "compareview"+id);
+
+                        $("#networkView").append(div);
+
+                        loadData(datasets[id], "#compareview"+id);
+                    });
+
+                    $("#networkView").html("");
+                    comparingDatasets.forEach(function(id){
+                        var div = $("<div />").attr("id", "compareview"+id);
+
+                        $("#networkView").append(div);
+
+                        loadData(datasets[id], "#compareview"+id);
+                    })
+
+                    // compareMode = false;
+                });
+            });
+        })
+
+    </script>
+
+  </body>
+</html>

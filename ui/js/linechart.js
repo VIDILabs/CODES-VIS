@@ -231,7 +231,7 @@ function lineChart(arg){
     Object.keys(series).forEach(function(si,j){
         var legendPos = width - 30,
             // legendWidth = legendPos / Object.keys(series).length;
-            legendWidth = 120;
+            legendWidth = 150;
         legend.append("line")
             .attr("x1", legendPos-5-j*legendWidth)
             .attr("x2", legendPos-20-j*legendWidth)

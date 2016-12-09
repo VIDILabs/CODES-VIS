@@ -18,8 +18,8 @@ define(dependencies, function(Panel, DropDownMenu, Sankey, Slider) {
             padding = {left: 60, right: 100, top: 35, bottom: 30};
 
         var binary,
-            entity = "terminal",
-            granularity = "node";
+            entity = "router",
+            granularity = "group";
 
         var container = Panel({
                 container: layoutID,

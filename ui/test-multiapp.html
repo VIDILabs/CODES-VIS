@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>i2v Test</title>
+        <!-- data-main attribute tells require.js to load
+             scripts/main.js after require.js loads. -->
+             <style>
+
+             .background path {
+               fill: none;
+               stroke: #ddd;
+               shape-rendering: crispEdges;
+               stroke-width: 0.5;
+               stroke-opacity: 0.5;
+             }
+
+             .foreground path {
+               fill: none;
+               stroke: steelblue;
+               stroke-width: 0.5;
+               stroke-opacity: 0.5;
+             }
+
+             .brush .extent {
+               fill-opacity: .3;
+               stroke: #fff;
+               shape-rendering: crispEdges;
+             }
+
+             .axis line,
+             .axis path {
+               fill: none;
+               stroke: #000;
+               shape-rendering: crispEdges;
+             }
+
+             .axis text {
+               text-shadow: 0 1px 0 #fff, 1px 0 0 #fff, 0 -1px 0 #fff, -1px 0 0 #fff;
+               cursor: move;
+             }
+
+             </style>
+    </head>
+    <body>
+        <div id="overview" style="float: left;"></div>
+        <div id="detailView" style="margin-left: 650px; margin-top: 50px;">
+        </div>
+        <div id="legend" style="margin-left: 650px; margin-top: 50px;"></div>
+        <script src="//d3js.org/d3.v3.min.js"></script>
+        <script src="jam/require.js"></script>
+        <script>
+        require([
+            "p4/io/ajax",
+            "p4/io/parser",
+            "p4/cquery/ctypes",
+            "p4/cquery/cstore",
+            "p4/core/datastruct",
+            "p4/core/pipeline",
+            "p4/core/arrays",
+            "i2v/charts/scatter",
+            "i2v/charts/column",
+            // "i2v/webgl/webgl",
+            "flexgl/flexgl",
+            'model/dragonfly',
+            'i2v/svg',
+            "js/colorLegend",
+            "parallelCoordinate",
+            "js/hierCircles",
+            "i2v/colors"
+        ],
+        function(
+            ajax,
+            parser,
+            ctypes,
+            CStore,
+            dataStruct,
+            pipeline,
+            arrays,
+            scatterPlot,
+            columnChart,
+            WebGL,
+            Dragonfly,
+            Svg,
+            colorLegend,
+            ParallelCoordinate,
+            circularView,
+            Colors
+        ){
+
+            // document.getElementById("dataset").onchange = function() {
+            //     document.getElementById("overview").innerHTML = "";
+            //     document.getElementById("detailView").innerHTML = "";
+            //     document.getElementById("legend").innerHTML = "";
+            //     visualizeBB(this.value + "/");
+            // }
+
+            var dataset = "dfly-5k-multiapp/";
+            // var dataset = "bb-cont-4096-nearest/";
+            visualizeBB(dataset);
+            function visualizeBB(dataset) {
+                console.log(dataset);
+                ajax.getAll([
+                     {url: dataset + "dragonfly-msg-stats", dataType: "text"},
+                     {url: dataset + "dragonfly-router-stats", dataType: "text"},
+                     {url: dataset + "dragonfly-router-traffic", dataType: "text"},
+                     {url: dataset + "workloads.conf", dataType: "text"},
+
+                ])
+                .then(function(text){
+
+                    var terminals = dataStruct({
+                        array: parser(text[0], " "),
+                        header: ["lp_id", "terminal_id", "data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time"],
+                        types: ["int", "int", "int", "float", "float", "float", "float"],
+                        skip: 1
+                    }).objectArray();
+
+                    terminals.forEach(function(t, ti){
+                        t.router_id = Math.floor(t.terminal_id / 6);
+                        t.router_rank = t.router_id % 12;
+                        t.group_id = Math.floor(t.terminal_id / 6 / 12);
+                        t.workload = "idle";
+                    })
+
+                    var jobNames = ["AMG", "AMR Boxlib", "MiniFE"];
+                    var jobs = text[3].split("\n").map(function(j){return j.split(" ")});
+                    jobs.pop();
+
+                    jobs.forEach(function(job, ji){
+                        job.forEach(function(tid){
+                            terminals[tid].workload = jobNames[ji];
+                        })
+                    })
+
+                    console.log(terminals);
+
+                    console.log(pipeline()
+                    .group({
+                        $by: "workload",
+                        data_size: "$sum",
+                        busy_time: "$sum",
+                        avg_hops: "$avg"
+                    })
+                    (terminals));
+
+
+                    var ROUTER_PER_GROUP = 12, GLOBAL_LINK = 6, TERMINAL_PER_ROUTER=6;
+
+                    var busytime = dataStruct({
+                        array: parser(text[2], " "),
+                        header: ["lp_id", "group_id", "router_id", "local_busy_time", "global_busy_time"],
+                        types: ["int", "int", "int", "veci"+ROUTER_PER_GROUP, "veci"+GLOBAL_LINK],
+                        skip: 1,
+                    }).objectArray();
+
+                    var traffic = dataStruct({
+                        array: parser(text[1], " "),
+                        header: ["lp_id", "group_id", "router_id", "local_traffic", "global_traffic"],
+                        types: ["int", "int", "int", "veci"+ROUTER_PER_GROUP, "veci"+GLOBAL_LINK],
+                        skip: 1,
+                    }).objectArray();
+
+                    var numNode = terminals.length,
+                        numRouter = traffic.length,
+                        numGroup = ROUTER_PER_GROUP * GLOBAL_LINK + 1;
+
+                    var dfly = Dragonfly({
+                        numRouter : numRouter,
+                        numGroup  : numGroup,
+                        numNode   : numNode,
+                        traffic: traffic,
+                        busytime: busytime,
+                        terminals: terminals
+                    });
+
+                    console.log(dfly.data);
+                    var interGroupTraffic = dfly.interGroupConnection().traffic,
+                        interGroupBusyTime = dfly.interGroupConnection().busy_time;
+                    var matrixData = new Float32Array(numGroup * numGroup);
+                    var max = Number.NEGATIVE_INFINITY, min = Number.POSITIVE_INFINITY;
+                    interGroupBusyTime.forEach(function(d, i){
+                        d.forEach(function(c, j){
+                            if( c > max ) max = c;
+                            if( c < min ) min = c;
+                            matrixData[i * numGroup + j] = c;
+                        })
+                    })
+                    // console.log(max, min, matrixData);
+
+                    function coord(r, d){
+                        return [
+                             r*Math.cos(d- Math.PI / 2),
+                             r*Math.sin(d- Math.PI / 2)
+                        ];
+                    }
+
+                    function nodeColor(d) {
+                        if(d == "AMG") return "orange";
+                        else if(d == "AMR Boxlib") return "#0A0";
+                        else if(d == "MiniFE") return "brown";
+                        else  return "#000";
+                    }
+
+                    function vizSingleGroup(data, sel) {
+                        groupID = sel.group_id;
+                        var groupResult = pipeline()
+                        .match({
+                            group_id: groupID
+                        })
+                        .sortBy({group_id: 1})
+                        (data);
+
+                        console.log(groupResult);
+                        var values = [];
+                        var matrix = groupResult.map(function(d){
+                            values = values.concat(d.local_busy_time);
+                            return d.local_traffic;
+                        })
+
+                        var chord = d3.layout.chord()
+                            .padding(0.1)
+                            .sortSubgroups(d3.descending)
+                            .matrix(matrix);
+
+                        var chordGroups = chord.groups();
+                        var width = 700, height = 900, radius = width / 2 - 50;
+                        var svg = d3.select("#detailView").append("svg")
+                            .attr("width", width)
+                            .attr("height", height)
+                          .append("g")
+                          .attr("transform", "translate(" + (width / 2 ) + "," + (height / 2 ) + ")");
+
+                        var colorScale = d3.scale.linear().domain([d3.min(values), d3.max(values)]).range(["white", "steelblue"]);
+
+                        svg.append("g")
+                            .attr("class", "chord")
+                          .selectAll("path")
+                            .data(chord.chords)
+                          .enter().append("path")
+                            .attr("d", d3.svg.chord().radius(radius))
+                            .style("fill", function(d){ return colorScale(groupResult[d.source.index].local_busy_time[d.target.index]); })
+                            // .style("fill", function(d) { return fill(d.target.index); })                        .style("stroke", function(d){return colorScale(data[d.source.index][structs[0].vmap.color][d.target.index]); })
+                            .style("opacity", 1)
+
+                        var nodes = [];
+                        groupResult.forEach(function(g, gi){
+                            g.terminals.forEach(function(t, ti){
+                                t.pid = gi;
+                            })
+
+                            nodes = nodes.concat(g.terminals);
+                        })
+
+                        var dataSizeDomain = [
+                            d3.min(nodes.map(function(d){ return d.data_size})),
+                            d3.max(nodes.map(function(d){ return d.data_size})),
+                        ]
+                        console.log(dataSizeDomain);
+                        var dataSizeScale = d3.scale.pow().exponent(0.2).domain(dataSizeDomain).range([1,10]);
+
+                        nodes.forEach(function(d, di){
+                            var angleRange = chordGroups[d.pid].endAngle - chordGroups[d.pid].startAngle,
+                                paddingX = 0.1 * angleRange;
+
+                            var getPosX = d3.scale.linear()
+                                .domain([0, 6])
+                                .range([chordGroups[d.pid].startAngle + paddingX/2, chordGroups[d.pid].endAngle- paddingX/2]);
+
+                            var pos = coord(radius + 20, getPosX(d.router_port));
+
+                            d.cx = pos[0];
+                            d.cy = pos[1];
+                        });
+
+                        svg.selectAll(".dot")
+                              .data(nodes)
+                            .enter().append("circle")
+                              .attr("class", "dot")
+                              .attr("r", function(d){ return dataSizeScale(d.data_size);})
+                              .attr("cx", function(d){return d.cx})
+                              .attr("cy",function(d){return d.cy})
+                              .style("fill", function(d){ return nodeColor(d.workload);})
+                              .style("fill-opacity", 1);
+
+                      var groupLabel = svg.append("g").selectAll("groupLabel")
+                             .data(chord.groups)
+                           .enter().append("g")
+                           .attr("transform", function(d) {return "rotate(" + ((d.startAngle + (d.endAngle - d.startAngle)/2) * 180 / Math.PI - 90) + ")translate(" + (340) + ",0)";;});
+
+                      groupLabel.append("text")
+                          .attr("dy", ".35em")
+                          .style("font-size", "16px")
+                          .attr("transform", function(d) { return (d.startAngle + (d.endAngle - d.startAngle)/2) > Math.PI/2 &&  (d.startAngle + (d.endAngle - d.startAngle)/2) < 1.5 * Math.PI ? "rotate(270) translate(-26)" :"rotate(90) translate(-26)"; })
+                             .text(function(d) { return "Router " + d.index;});
+
+                        var lengendSvg = Svg({width: 1000, height: 50, container: "legend"});
+                        document.getElementById("legend").innerHTML = "";
+                        colorLegend({
+                             colors: ["white", "steelblue"],
+                             domain:  [d3.min(values), d3.max(values)],
+                             width: 400,
+                             title: "Local Link Usage: ",
+                             height: 40,
+                             container: lengendSvg
+                         });
+                    }
+
+                    function vizMultiGroup(data, groups) {
+                        document.getElementById("legend").innerHTML = "";
+                        // var groups = sel.map(function(d){return d.group_id;});
+                        var groupResult = pipeline()
+                        .match({
+                            group_id: {$in: groups}
+                        })
+                        .group({
+                            $by: "group_id",
+                            terminals: "$mergeArray",
+                            local_links: "$addToArray",
+                            local_busy_time: "$addToArray",
+                            local_traffic: "$addToArray",
+                        })
+                        .sortBy({group_id: 1})
+                        (data);
+
+                        // console.log(groupResult);
+                        // console.log(interGroupTraffic);
+
+                        var values = [];
+                        var matrixTraffic = [], matrixBusyTime = [];
+
+                        groups.forEach(function(gi){
+                            var res, traffic = [], busytime = [];
+                            groups.forEach(function(fi){
+                                traffic.push(Math.pow(interGroupTraffic[gi][fi],0.25) || 0);
+                                busytime.push(interGroupBusyTime[gi][fi] || 0);
+                            });
+                            matrixTraffic.push(traffic);
+                            matrixBusyTime.push(busytime);
+                            values = values.concat(busytime);
+                        });
+
+                        var matrixCount = [];
+                        groups.forEach(function(gi){
+                            var counts = [];
+                            groups.forEach(function(fi){
+                                var count = (gi==fi)? 0: 1;
+                                counts.push(count);
+                            });
+                            matrixCount.push(counts)
+                        });
+
+                        var chord = d3.layout.chord()
+                            .padding(0.1)
+                            .sortSubgroups(d3.descending)
+                            .matrix(matrixCount);
+
+                        var chordGroups = chord.groups();
+                        var width = 800, height = 800, radius = 170;
+                        var svg = d3.select("#detailView").append("svg")
+                            .attr("width", width)
+                            .attr("height", height)
+                          .append("g")
+                          .attr("transform", "translate(" + (width / 2 ) + "," + (height / 2 ) + ")");
+
+                        var colorScale = d3.scale.linear().domain([d3.min(values), d3.max(values)]).range(["white", "purple"]);
+
+                        svg.append("g")
+                            .attr("class", "chord")
+                          .selectAll("path")
+                            .data(chord.chords)
+                          .enter().append("path")
+                            .attr("d", d3.svg.chord().radius(radius))
+                            .style("stroke", "purple")
+                            .style("stroke-width", 0.5)
+                            .style("fill", function(d){ return colorScale(matrixBusyTime[d.source.index][d.target.index]); })
+                            .style("opacity", 1)
+
+                        var trafficMax = arrays.max(arrays.max(groupResult.map(function(d){
+                            return arrays.max(d.local_traffic);
+                        })));
+
+                        var trafficMin = arrays.min(arrays.min(groupResult.map(function(d){
+                            return arrays.min(d.local_traffic);
+                        })))
+
+                        var localTrafficScale = d3.scale.linear().domain([trafficMin, trafficMax]).range(["#eee",  "steelblue"]);
+
+                        var nodeDataSizeMin = arrays.min(arrays.min(groupResult.map(function(d){
+                            return d.terminals.map(function(t){ return t.data_size; });
+                        })));
+
+                        var nodeDataSizeMax = arrays.max(arrays.max(groupResult.map(function(d){
+                            return d.terminals.map(function(t){ return t.data_size; });
+                        })));
+
+                        var nodeDataSizeDomain = [nodeDataSizeMin, nodeDataSizeMax],
+                            nodeDataSizeScale = d3.scale.pow().exponent(0.2).domain(nodeDataSizeDomain).range([2,6]);
+
+                        var getPosY = d3.scale.linear()
+                            .domain([0, TERMINAL_PER_ROUTER])
+                            .range([240, 240 + 18 * 5]);
+
+                        chordGroups.forEach(function(d, di){
+                            // var d = chordGroups[1], di =1;
+                            var delta = (d.endAngle - d.startAngle ) / groupResult[di].local_links.length;
+
+                            groupResult[di].local_links.forEach(function(link, li) {
+                                link.forEach(function(rtr, ri){
+                                    var start =  d.startAngle + ri*delta;
+                                    rtr.startAngle = start;
+                                    rtr.endAngle = start + delta;
+                                    rtr.pid = d.index;
+                                });
+
+                                svg.append("g").selectAll("path")
+                                    .data(link)
+                                  .enter().append("path")
+                                    .style("fill", function(d) { return localTrafficScale(d.traffic)})
+                                    .attr("d",function(d) { return d3.svg.arc().innerRadius(160+li*5).outerRadius(170+li*5)(d) })
+                            });
+
+
+                            var angleRange = d.endAngle - d.startAngle,
+                                paddingX = 0.05 * angleRange;
+
+                            var getPosX = d3.scale.linear()
+                                .domain([0, ROUTER_PER_GROUP])
+                                .range([d.startAngle + paddingX/2, d.endAngle- paddingX/2]);
+
+                            groupResult[di].terminals.forEach(function(t, ti){
+                                var pos = coord(getPosY(t.router_port), getPosX(t.router_rank));
+                                t.cx = pos[0];
+                                t.cy = pos[1];
+                            });
+
+                            svg.append("g").selectAll(".dot")
+                                  .data(groupResult[di].terminals)
+                                .enter().append("circle")
+                                  .attr("class", "dot")
+                                  .attr("r",  function(d){ return nodeDataSizeScale(d.data_size);})
+                                  .attr("cx", function(d){return d.cx})
+                                  .attr("cy",function(d){return d.cy})
+                                  .style("fill", function(d){ return nodeColor(d.workload)})
+                                  .style("fill-opacity", 1);
+                        })
+
+                            var groupLabel = svg.append("g").selectAll("groupLabel")
+                                  .data(chord.groups)
+                                .enter().append("g")
+                                .attr("transform", function(d) {return "rotate(" + ((d.startAngle + (d.endAngle - d.startAngle)/2) * 180 / Math.PI - 90) + ")translate(" + (340) + ",0)";;});
+
+                            groupLabel.append("text")
+                               .attr("dy", ".35em")
+                               .style("font-size", "16px")
+                               .attr("transform", function(d) { return (d.startAngle + (d.endAngle - d.startAngle)/2) > Math.PI/2 &&  (d.startAngle + (d.endAngle - d.startAngle)/2) < 1.5 * Math.PI ? "rotate(270) translate(-26)" :"rotate(90) translate(-26)"; })
+                                  .text(function(d, i) { return "Group " + groupResult[i].group_id;});
+
+                            var lengendSvg = Svg({width: 1000, height: 50, container: "legend"});
+
+                            document.getElementById("legend").appendChild(colorLegend({
+                                colors: ["white", "purple"],
+                                domain:  [d3.min(values), d3.max(values)],
+                                width: 400,
+                                title: "",
+                                height: 40,
+                                container: lengendSvg
+                            }));
+                            document.getElementById("legend").appendChild(colorLegend({
+                                colors: ["white", "steelblue"],
+                                domain:  [trafficMin, trafficMax],
+                                width: 400,
+                                title: " ",
+                                height: 40,
+                                container: lengendSvg
+                            }));
+                    }
+
+                    function selectGroup(groups) {
+                        // var groupID = groups[0];
+                        console.log(groups);
+                        document.getElementById("detailView").innerHTML = "";
+
+                        if(groups.length == 1) {
+                            vizSingleGroup(dfly.data, groups[0]);
+                        } else {
+                            vizMultiGroup(dfly.data, groups);
+                        }
+                    }
+
+                    vizMultiGroup(dfly.data, [0,1,2,3,4,5,6,7,8]);
+
+                    var localLinkData = [];
+                    dfly.data.forEach(function(d) {
+                        localLinkData = localLinkData.concat(d.local_links);
+                    });
+
+                    var localLinkUsageChart = new scatterPlot({
+                        width: 600,
+                        height: 600,
+                        data: localLinkData,
+                        vmap: {x: "traffic", y: "busy_time"},
+                        container: "overview",
+                        color: "steelblue",
+                        alpha: 0.5,
+                        title: "Statistics for Local Links (Intra-Group Connections)",
+                        padding: {left: 70, bottom: 40, top: 40, right: 20}
+                    });
+
+                    var pcData = new ParallelCoordinate({
+                        width: 720,
+                        height: 320,
+                        data: localLinkData,
+                        container: "#detailView"
+                    })
+
+                    new scatterPlot({
+                        width: 400,
+                        height: 400,
+                        data: terminals,
+                        vmap: {x: "packets_finished", y: "avg_hops", color: "workload"},
+                        // container: "mainView",
+                        colors: nodeColor,
+                        alpha: 0.5,
+                        // title: "PE-Level Statistics",
+                        padding: {left: 70, bottom: 40, top: 40, right: 20}
+                    });
+                    console.log(Colors("Oranges").colors.slice(1));
+
+                    var structs = [
+                        {
+                            entity: "router",
+                            level: "router",
+                            vmap: {color: "local_busy_time", size: "local_traffic"},
+                            type: 'links',
+                            size: 0,
+                            groupLabel: true,
+                            partitionAttr: "workload",
+                            numPartition: 12,
+                            // colors: ["white", "#cc5500"]
+                            colors: ["#eee", "steelblue"]
+                        },
+                        // {
+                        //     entity: "router",
+                        //     level: "router",
+                        //     vmap: {
+                        //         color: "global_busy_time",
+                        //         // size: "global_traffic"
+                        //     },
+                        //     aggregate: "router_id",
+                        //     type: 'bar',
+                        //     colors: ['green', 'yellow'],
+                        //     size: 1,
+                        // },
+                        {
+                            entity: "router",
+                            level: "router",
+                            vmap: {color: "global_busy_time"},
+                            // aggregate: "router_id",
+                            type: 'bar',
+                            colors:  ['white', 'purple'],
+                            size: 1,
+                        },
+                        {
+                            entity: "terminal",
+                            level: "router",
+                            vmap: {y: "avg_hops", x: "router_id", opacity: "avg_packet_latency", color: "workload", size: "busy_time"},
+                            size: 1,
+                            type: 'bar',
+                            colors: nodeColor,
+                            // aggregate: "router_id",
+                            // aggregate: true
+                        },
+                    ];
+
+                    new circularView({
+                        data: dfly.partition("workload", jobNames.concat("idle")),
+                        container: "#detailView",
+                        structs: structs,
+                        width: 800
+                    })
+                    var webgl = WebGL({
+                        // container: "i2vCanvas",
+                        height: 400,
+                        width: 400,
+                        container: "overview",
+                        padding: {left: 70, top: 20, right: 20, bottom: 50}
+                    });
+
+                    webgl
+                        .uniform("numGroup", "float", [numGroup])
+                        .uniform("dim", "vec2", webgl.dimension())
+                        // .uniform("domain", "vec2", [min, max])
+                        .uniform("coef", "vec2", [-min/(max-min), 1/(max-min)])
+                        .attribute("pos", "vec2",  new Float32Array([
+                            -1.0, -1.0,
+                             1.0, -1.0,
+                            -1.0,  1.0,
+                            -1.0,  1.0,
+                             1.0, -1.0,
+                             1.0,  1.0
+                        ]))
+                        .texture("data", "float", matrixData, [numGroup, numGroup]);
+
+                    webgl.shader({
+                        type: "vertex",
+                        deps: ["numGroup", "pos"],
+                        debug: true
+                    }, function mainFrag() {
+                         gl_Position = vec4(pos, 0, 1);
+                    });
+
+                    webgl.shader({
+                        type: "fragment",
+                        deps: ["data", "coef", "dim"],
+                        debug: true
+                    }, function mainFrag() {
+                        var a, x, y;
+                        x = (gl_FragCoord.x+0.5) / dim.x;
+                        y = 1.0 - (gl_FragCoord.y+0.5) / dim.y;
+                        a = texture2D(data, vec2(x, y)).a;
+                        a = a * coef.y + coef.x;
+                        gl_FragColor = vec4(0.9, 0.0, 0.9, a);
+                    });
+
+                    webgl.program("heatmap");
+                    gl = webgl.ctx;
+                    gl.clearColor( 0.0, 0.0, 0.0, 0.0 );
+                    gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
+
+                    gl.drawArrays(gl.TRIANGLES, 0, 6);
+                });
+            }
+
+        });
+
+        </script>
+    </body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>i2v Test</title>
+        <style>
+        .i2v-viz {
+            position: relative;
+        }
+        .i2v-viz canvas{
+            position: absolute;
+        }
+        .i2v-viz svg{
+            position: absolute;
+        }
+        </style>
+        <style>
+
+        .background path {
+          fill: none;
+          stroke: #ddd;
+          shape-rendering: crispEdges;
+          stroke-width: 0.5;
+          stroke-opacity: 0.5;
+        }
+
+        .foreground path {
+          fill: none;
+          stroke: steelblue;
+          stroke-width: 0.5;
+          stroke-opacity: 0.5;
+        }
+
+        .brush .extent {
+          fill-opacity: .3;
+          stroke: #fff;
+          shape-rendering: crispEdges;
+        }
+
+        .axis line,
+        .axis path {
+          fill: none;
+          stroke: #000;
+          shape-rendering: crispEdges;
+        }
+
+        .axis text {
+          text-shadow: 0 1px 0 #fff, 1px 0 0 #fff, 0 -1px 0 #fff, -1px 0 0 #fff;
+          cursor: move;
+        }
+
+        </style>
+    </head>
+    <body>
+        <div id="overview" style="float: left;"></div>
+        <div id="detailView" style="margin-left: 650px; margin-top: 50px;">
+        </div>
+        <div id="legend" style="margin-left: 650px; margin-top: 50px;"></div>
+        <script src="//d3js.org/d3.v3.min.js"></script>
+        <script src="jam/require.js"></script>
+        <script>
+        require([
+            "p4/io/ajax",
+            "p4/io/parser",
+            "p4/cquery/cstore",
+            "i2v/charts/parallelCoordinate",
+        ],
+        function(
+            ajax,
+            parser,
+            CStore,
+            ParallelCoordinate
+        ){
+            var dataset = "dfly-5k-multiapp/";
+            // var dataset = "dfly-1056-nonmin-uniformRandom/";
+            ajax.get({
+                url: dataset + "dragonfly-msg-stats", dataType: "text"
+            })
+            .then(function(text){
+                var terminalData = parser(text, " ");
+                terminalData.shift();
+                var cdb = CStore({
+                    size: terminalData.length,
+                    names: ["lp_id", "terminal_id", "data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time"],
+                    types: ["int", "int", "int", "float", "float", "float", "float"],
+                });
+                cdb.addRows(terminalData);
+
+                var pc = new ParallelCoordinate({
+                    width: 800,
+                    height: 300,
+                    padding: {left: 50, right: 50, top: 30, bottom: 10},
+                    features: cdb.info().keys,
+                    data: cdb.data(),
+                    domains: cdb.domains()
+                });
+            });
+        });
+
+        </script>
+    </body>
+</html>

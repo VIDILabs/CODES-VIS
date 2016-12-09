@@ -5457,6 +5457,7 @@ module.exports = function Svg(arg){
                 for(var i = domain[0]; i < domain[1]; i=i+intv)
                     di.push(i);
 
+                if(di[di.length-1]!=domain[1] && !isNaN(domain[1])) di.push(domain[1]);
                 return di;
             }
         }

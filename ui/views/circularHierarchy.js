@@ -2,10 +2,23 @@ var dependencies = [
     'js/ringchart',
     'js/ringgrid',
     'js/dragonfly-link',
-    'js/histogram'
+    'js/histogram',
+    'p4/core/pipeline',
+    'model/dragonfly',
+    "js/hierCircles"
 ];
 
-define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
+define(
+    dependencies,
+    function(
+        ringChart,
+        ringGrid,
+        interLinks,
+        histogram,
+        pipeline,
+        Dragonfly,
+        hierCircles
+    ){
     return function networkView(arg){
         var nv = {},
             rings = [],
@@ -26,15 +39,18 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
             numTerminal = option.numTerminal,
             routerRadix = option.routerRadix,
             struct = option.struct,
+            jobs = option.workload,
             statCharts = option.statCharts,
             onhover = option.onhover || null;
 
         width -= margin.left + margin.right;
         height -= margin.top + margin.bottom;
-
+        var jobNames = ["AMG", "AMR Boxlib", "MiniFE", "idle"];
         var links,
-            linkRadius = option.linkRadius || width/4 + 10,
-            svg = i2v.Svg({width: width, height: height, container: container, id: "topoView"});
+            linkRadius = option.linkRadius || width/4 + 10;
+            // svg = i2v.Svg({width: width, height: height, container: container, id: "topoView"});
+
+        $(container).append($("<div/>").attr("id", "circularView"));
 
         var statViewDiv = document.createElement('div');
         statViewDiv.style.position = "static";
@@ -49,9 +65,9 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
             })
         }
 
-        svg.setAttribute("id", "topoView");
-        svg.style.position = "absolute";
-        svg.style.margin = "40px 20px 20px 20px";
+        // svg.setAttribute("id", "topoView");
+        // svg.style.position = "absolute";
+        // svg.style.margin = "40px 20px 20px 20px";
 
         var ranks = {
             terminal:{
@@ -117,77 +133,93 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
             return hist;
         }
 
-        function init(){
-            struct.forEach(function(s, si){
-                if(!s.config) return;
-                var result = (s.data) ? s.data : data[s.entity][s.level];
-                // console.log(result.length);
-                var ring = ringChart({
-                    data: result,
-                    vmap: s.vmap,
-                    width: width,
-                    height: height,
-                    outerRadius: s.radius + s.thick,
-                    innerRadius: s.radius,
-                    color: s.color || 120,
-                    circle: s.circle,
-                    container: svg,
-                    dataRange: stats[s.entity][s.level].stats
-                });
+        function processData() {
+            var ROUTER_PER_GROUP = numRouter / numGroup,
+                TERMINAL_PER_ROUTER = numTerminal / numRouter;
 
-                rings[si] = ring;
-            })
+            var terminals = data.terminal.node,
+                local_links = data.router.node.filter(function(d){ d.router_id = Math.floor(d.rank/routerRadix); return (d.type===1); }),
+                global_links = data.router.node.filter(function(d){ return (d.type==2); });
 
-            // var result = new p4.pipeline(data.router.node)
-            //     .match({type: 2}).result();
-            //
-            var result = data.router.node.filter(function(d){return d.type === 2;})
-
-            // console.log(result.map(function(d){ return d.traffic}));
-
-            links = interLinks({
-                data: result,
-                vmap: {color: "traffic"},
-                width: width,
-                height: height,
-                radius: linkRadius,
-                container: svg,
-                colors: i2v.colors("PiYG").colors.reverse(),
-                numRouter: numRouter,
-                numTerminal: numTerminal,
-                numGroup: numGroup,
-                numLink: routerRadix/4,
-                dataRange: stats.router.node.stats
-                // color: s.color || 120,
-                // circle: s.circle,
+            terminals.forEach(function(t){
+                t.terminal_id = t.rank;
+                t.workload = "idle";
             });
 
-            var groupGrid = ringGrid({
+            console.log(jobs);
+            jobs.forEach(function(job, ji){
+                job.forEach(function(tid){
+                    terminals[tid].workload = jobNames[ji];
+                })
+            });
+
+            var gLinks = pipeline().group({
+                $by: 'router_id',
+                busy_time: "$addToArray",
+                traffic: "$addToArray"
+            })(global_links);
+
+            var localLinks = pipeline().group({
+                $by: 'router_id',
+                busy_time: "$addToArray",
+                traffic: "$addToArray"
+            }).derive(function(d){
+                d.local_busy_time = d.busy_time;
+                d.local_traffic = d.traffic;
+
+                delete d.busy_time;
+                delete d.traffic;
+            })(local_links);
+
+            var routers = localLinks;
+
+
+            routers.forEach(function(r, ri){
+                r.group_id = Math.floor(r.router_id / ROUTER_PER_GROUP);
+                r.router_id = r.router_id % ROUTER_PER_GROUP;
+                r.global_traffic = gLinks[ri].traffic;
+                r.global_busy_time = gLinks[ri].busy_time;
+            })
+
+            var ds = Dragonfly({
+                numRouter : numRouter,
+                numGroup  : numGroup,
+                numNode   :  numTerminal,
+                routers: routers,
+                terminals: terminals
+            });
+
+            var rr = ds.partition(struct[0].partitionAttr, struct[0].numPartition);
+
+            console.log(struct[0].partitionAttr, struct[0].numPartition, rr);
+            return rr;
+        }
+
+        function init(){
+
+            var result = processData();
+            $("#circularView").html("");
+            hierCircles({
+                container: "#circularView",
                 width: width,
-                height: height,
-                innerRadius: linkRadius,
-                outerRadius: width/2,
-                count: numGroup,
-                container: svg,
-                onhover: function(d) {
-                    if(onhover) onhover(d);
-                    links.select(d);
-                }
+                structs: struct,
+                data: result,
+                hover: onhover
             });
 
             //remove all highlights when the mouse leaves SVG
-            groupGrid.onmouseleave = function() {
-                if(onhover) onhover(-1);
-                links.select(-1);
-            }
+            // groupGrid.onmouseleave = function() {
+            //     if(onhover) onhover(-1);
+            //     links.select(-1);
+            // }
 
-            svgPanZoom("#topoView", {
-                 zoomEnabled: true,
-                 controlIconsEnabled: true,
-                 fit: true,
-                 center: true,
-                 minZoom: 0.1
-            });
+            // svgPanZoom("#circularViewSVG", {
+            //      zoomEnabled: true,
+            //      controlIconsEnabled: true,
+            //      fit: true,
+            //      center: true,
+            //      minZoom: 0.1
+            // });
             // nv.hide();
             //
             if(statCharts){
@@ -225,16 +257,17 @@ define(dependencies, function(ringChart, ringGrid, interLinks, histogram){
         nv.update = function(newData){
 
             data = newData;
-            struct.forEach(function(s, si){
-                if(!s.config) return;
-                var result = (s.data) ? s.data : data[s.entity][s.level];
-                rings[si].update(result);
+
+            $("#circularView").html("");
+            hierCircles({
+                container: "#circularView",
+                width: width,
+                structs: struct,
+                data: processData(),
+                numPartition: 8,
+                hover: onhover,
             });
 
-            var result = new p4.pipeline(data.router.node)
-                .match({type: 2}).result();
-
-            links.update(result);
 
             if(statCharts){
                 statCharts.forEach(function(s, i){

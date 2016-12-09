@@ -17,19 +17,27 @@ console.log("initializing server ");
 app.use(express.static('ui'));
 app.use(express.static('jam'));
 app.use(express.static('data'));
+app.use(express.static('testData'));
 app.use("/npm", express.static('node_modules'));
 
 // ivastack modules
-app.use("/vui", express.static('../../vui/src'));
-app.use("/p4", express.static('../../p4/src'));
-app.use("/i2v", express.static('../../i2v/src'));
+var srcDir = {
+    vui: '../../vui/src',
+    i2v: '../../i2v/src',
+    p4: '../../p4/src'
+};
+
+app.use("/vui", express.static(srcDir.vui));
+app.use("/i2v", express.static(srcDir.i2v));
+app.use("/p4",  express.static(srcDir.p4));
+app.use("/flexgl",  express.static('../../flexgl/src'));
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: true}));
 
-var ctypes = require("../../p4/src/ctypes/ctypes.js"),
-    cstore = require("../../p4/src/ctypes/cstore.js"),
-    csv = require("../../p4/src/io/node-dsv.js");
+var ctypes = require(srcDir.p4 + "/cquery/ctypes.js"),
+    cstore = require(srcDir.p4 + "/cquery/cstore.js"),
+    csv = require(srcDir.p4 + "/io/node-dsv.js");
 
 var dataDirPath = "./data";
 function listDataDirectories() {
@@ -43,7 +51,6 @@ var datasets = listDataDirectories().map(function(dir){
     dataset.directory = dir;
     return dataset;
 });
-
 
 var entities = ["terminal", "router"],
     granularities = ["group", "router", "node"];
@@ -100,10 +107,10 @@ function loadDataFromFiles(datasetID, callback) {
             size: size,
             struct: {
                 rank            : "int",
-                chunks_finished : "float",
+                packets_finished : "float",
                 data_size       : "float",
-                hops_finished   : "float",
-                time_spent      : "float",
+                avg_hops   : "float",
+                avg_packet_latency      : "float",
                 busy_time       : "float",
                 timestamp       : "float"
             },
@@ -143,9 +150,9 @@ function loadDataFromFiles(datasetID, callback) {
             size: size,
             struct: {
                 rank              : "int",
-                local_busytime    : "float",
-                global_busytime   : "float",
-                terminal_busytime : "float",
+                local_busy_time    : "float",
+                global_busy_time   : "float",
+                terminal_busy_time : "float",
                 local_traffic     : "float",
                 global_traffic    : "float",
                 terminal_traffic  : "float",
@@ -216,34 +223,34 @@ function loadDataFromFiles(datasetID, callback) {
                 var ptr = 0;
                 for(var j = 0; j < ROUTER_LOCAL_LINKS; j++) {
                     var port = [],
-                        rank = data["rank"][i*STEP_TOTAL+t] * ROUTER_RADIX + ptr + j;
+                        rank = data.get("rank")[i*STEP_TOTAL+t] * ROUTER_RADIX + ptr + j;
                     port.push(rank );
                     port.push(1);
-                    port.push(data["busytime_local"+j][i*STEP_TOTAL+t]);
-                    port.push(data["traffic_local"+j][i*STEP_TOTAL+t]);
-                    port.push(data["timestamp"][i*STEP_TOTAL+t]);
+                    port.push(data.get("busytime_local"+j)[i*STEP_TOTAL+t]);
+                    port.push(data.get("traffic_local"+j)[i*STEP_TOTAL+t]);
+                    port.push(data.get("timestamp")[i*STEP_TOTAL+t]);
                     ports[rank*STEP_TOTAL+t] = port;
                 }
                 ptr += ROUTER_LOCAL_LINKS;
                 for(var j = 0; j < ROUTER_GLOBAL_LINKS; j++) {
                     var port = [],
-                        rank = data["rank"][i*STEP_TOTAL+t] * ROUTER_RADIX + ptr + j;
+                        rank = data.get("rank")[i*STEP_TOTAL+t] * ROUTER_RADIX + ptr + j;
                     port.push(rank);
                     port.push(2);
-                    port.push(data["busytime_global"+j][i*STEP_TOTAL+t]);
-                    port.push(data["traffic_global"+j][i*STEP_TOTAL+t]);
-                    port.push(data["timestamp"][i*STEP_TOTAL+t]);
+                    port.push(data.get("busytime_global"+j)[i*STEP_TOTAL+t]);
+                    port.push(data.get("traffic_global"+j)[i*STEP_TOTAL+t]);
+                    port.push(data.get("timestamp")[i*STEP_TOTAL+t]);
                     ports[rank*STEP_TOTAL+t] = port;
                 }
                 ptr += ROUTER_GLOBAL_LINKS;
                 for(var j = 0; j < TERMINAL_PER_ROUTER; j++) {
                     var port = [],
-                        rank = data["rank"][i*STEP_TOTAL+t] * ROUTER_RADIX + ptr + j;
+                        rank = data.get("rank")[i*STEP_TOTAL+t] * ROUTER_RADIX + ptr + j;
                     port.push(rank);
                     port.push(3);
-                    port.push(data["busytime_terminal"+j][i*STEP_TOTAL+t]);
-                    port.push(data["traffic_terminal"+j][i*STEP_TOTAL+t]);
-                    port.push(data["timestamp"][i*STEP_TOTAL+t]);
+                    port.push(data.get("busytime_terminal"+j)[i*STEP_TOTAL+t]);
+                    port.push(data.get("traffic_terminal"+j)[i*STEP_TOTAL+t]);
+                    port.push(data.get("timestamp")[i*STEP_TOTAL+t]);
                     ports[rank*STEP_TOTAL+t] = port;
                 }
             }
@@ -262,9 +269,9 @@ function loadDataFromFiles(datasetID, callback) {
             port = new Int16Array(size);
 
         for(var i = 0; i < size; i++){
-            group_id[i] = Math.floor(data["rank"][i] / NUM_GROUP);
-            router_id[i] = Math.floor(data["rank"][i] /  NUM_ROUTER);
-            port[i]= data["rank"][i] % TERMINAL_PER_ROUTER;
+            group_id[i] = Math.floor(data.get("rank")[i] / NUM_GROUP);
+            router_id[i] = Math.floor(data.get("rank")[i] /  NUM_ROUTER);
+            port[i]= data.get("rank")[i] % TERMINAL_PER_ROUTER;
         }
         ds.addColumns(group_id, "group_id", "short");
         ds.addColumns(router_id, "router_id", "int");
@@ -279,7 +286,7 @@ function loadDataFromFiles(datasetID, callback) {
         var group_id = new Int16Array(size);
 
         for(var i = 0; i < size; i++){
-            group_id[i] = Math.floor(data["rank"][i] / ROUTER_PER_GROUP);
+            group_id[i] = Math.floor(data.get("rank")[i] / ROUTER_PER_GROUP);
         }
         routerData.addColumns(group_id, "group_id", "short");
     }
@@ -294,7 +301,7 @@ function loadDataFromFiles(datasetID, callback) {
 
         var aggrData,
             struct = {rank :"int", timestamp :"float"};
-
+        console.log(metadata);
         metadata.names.forEach(function(name){
             if([key, "timestamp", "rank", "group_id", "router_id", "port"].indexOf(name) == -1) {
                 attributes.push(name);
@@ -322,13 +329,13 @@ function loadDataFromFiles(datasetID, callback) {
         for(var i = 0; i < numBins; i++) {
             var rows = []
             for(var j = 0; j < STEP_TOTAL; j++){
-                var aggr = [i, data.timestamp[i*STEP_TOTAL*binSize+j]];
+                var aggr = [i, data.get("timestamp")[i*STEP_TOTAL*binSize+j]];
                 attributes.forEach(function(a){
                     aggr.push(0);
                 });
                 for(var k = 0; k < binSize; k ++){
                     attributes.forEach(function(a, ai){
-                        aggr[ai+2] += data[a][i*STEP_TOTAL*binSize+k*STEP_TOTAL+j];
+                        aggr[ai+2] += data.get(a)[i*STEP_TOTAL*binSize+k*STEP_TOTAL+j];
                     });
                 }
                 rows.push(aggr);
@@ -341,14 +348,14 @@ function loadDataFromFiles(datasetID, callback) {
     function getTemporalStats(ds, debug) {
         var timeStats = {},
             data = ds.columns(),
-            size = data['rank'].length,
+            size = data.get("rank").length,
             // attributes = Object.keys(data).filter(function(a){return a != "timestamp" && a!="rank";});
             attributes = Object.keys(data);
         attributes.forEach(function(attr){
             timeStats[attr] = [];
             timeStats[attr].push({min: 0, max: 0, avg: 0, count: 1});
             for(var i = 0; i < size; i++){
-                var t = Math.floor(data["timestamp"][i] / SAMPLE_RATE);
+                var t = Math.floor(data.get("timestamp")[i] / SAMPLE_RATE);
 
                 if(timeStats[attr][t]) {
                     if(data[attr][i] > timeStats[attr][t].max)
@@ -381,10 +388,10 @@ function loadDataFromFiles(datasetID, callback) {
             var size = terminalData.metadata().count,
                 stats = terminalData.stats();
 
-            SAMPLE_RATE = terminalData.columns()["timestamp"][0];
+            SAMPLE_RATE = terminalData.columns().get("timestamp")[0];
             STEP_TOTAL = Math.floor(stats["timestamp"].max / SAMPLE_RATE);
-            // NUM_TERMINAL = stats["rank"].max + 1;
-            // NUM_TERMINAL = terminalData.columns()["rank"][size-1] + 1;
+            // NUM_TERMINAL = stats.get("rank").max + 1;
+            // NUM_TERMINAL = terminalData.columns().get("rank")[size-1] + 1;
 
             assignTerminalRank(terminalData);
             DataStore.terminal.group = aggregate(terminalData, "group_id");
@@ -412,7 +419,7 @@ function loadDataFromFiles(datasetID, callback) {
                         stats = routerRawData.metadata().stats;
                     // SAMPLE_RATE = routerData["timestamp"][0];
                     STEP_TOTAL = Math.floor(stats["timestamp"].max / SAMPLE_RATE);
-                    // NUM_ROUTER = stats["rank"].max+1;
+                    // NUM_ROUTER = stats.get("rank").max+1;
                     // SAMPLE_RATE = routerData.columns()["timestamp"][0];
                     // STEP_TOTAL = Math.floor(stats["timestamp"].max / SAMPLE_RATE);
 
@@ -467,9 +474,7 @@ function loadDataFromFiles(datasetID, callback) {
             });
         }
     });
-
 }
-
 
 app.get('/', function (req, res) {
   res.sendfile(__dirname + '/index.html');
@@ -507,7 +512,7 @@ app.get('/data/:dataID', function(req, res){
                     names = DataStore[e][g].metadata().names;
 
                 names.forEach(function(f) {
-                    buffers.push(new Buffer(col[f].buffer));
+                    buffers.push(new Buffer(col.get(f).buffer));
                 });
             });
         });
@@ -527,7 +532,7 @@ app.get('/binary/:dataID/:entity/:granu', function(req, res){
             names = DataStore[entity][granu].metadata().names;
 
         names.forEach(function(f) {
-            buffers.push(new Buffer(col[f].buffer));
+            buffers.push(new Buffer(col.get(f).buffer));
         });
 
         var buf = Buffer.concat(buffers);

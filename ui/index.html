@@ -58,31 +58,51 @@
               <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
               </div>
-              <div class="modal-body" style="height: 90vh;">
+              <div class="modal-body" style="height: 85vh;">
                   <div class="row">
+                      <form>
+                        <div class="form-group row">
+                            <label class="col-sm-3 form-control-label" for="aggregateDataBy">Group By:</label>
+                            <div class="col-sm-9">
+                                <select class="form-control" id="aggregateDataBy">
+                                  <option>Group Id</option>
+                                  <!-- <option>Router Id</option> -->
+                                  <option>Total Global Busy Time</option>
+                                  <option>Total Global Traffic</option>
+                                  <option>Total Local Busy Time</option>
+                                  <option>Total Local Traffic</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                          <label class="col-sm-3 form-control-label" for="numberOfPartition" >Number of Groups: </label>
+                          <div class="col-sm-9">
+                              <input id="numberOfPartition" type="number" />
 
-                    <table class="table table-striped">
-                      <thead>
-                        <tr>
-                          <th>Order</th>
-                          <th>Entity</th>
-                          <th>Granularity</th>
-                          <th>Size</th>
-                          <th>Color</th>
-                          <th>Color Mapping</th>
-                        </tr>
-                      </thead>
-                      <tbody id="networkViewSetting"> </tbody>
-                    </table>
+                          </div>
+                        </div>
+                      </form>
+                      <table class="table table-striped">
+                        <thead>
+                          <tr>
+                            <th class="col-md-1">Order</th>
+                            <th class="col-md-1">Entity</th>
+                            <th class="col-md-4">Visual Encoding</th>
+                            <th class="col-md-4">Color Mapping</th>
+                            <th class="col-md-2"></th>
+                          </tr>
+                        </thead>
+                        <tbody id="networkViewSetting"> </tbody>
+                      </table>
 
                     <div id="networkGraph" style="margin-left: 50px;"></div>
 
                   </div>
               </div>
-              <!-- <div class="modal-footer">
+              <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                 <button type="button" class="btn btn-primary">Save changes</button>
-              </div> -->
+              </div>
             </div>
           </div>
         </div>

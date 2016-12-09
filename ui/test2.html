@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="../../favicon.ico"> -->
+    <title>CODES VIS</title>
+    <link href="npm/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="npm/bootstrap-slider/dist/css/bootstrap-slider.min.css" rel="stylesheet">
+    <link href="npm/bootstrap-colorpicker/dist/css/bootstrap-colorpicker.min.css" rel="stylesheet">
+    <link href="style/style.css" rel="stylesheet">
+    <!-- <link href="style/app.css" rel="stylesheet"> -->
+    <style>
+        .chord path {
+          fill-opacity: .67;
+          stroke: #000;
+          stroke-width: .5px;
+        }
+        .form-control-label {
+            text-align: right;
+            vertical-align: middle;
+        }
+    </style>
+  </head>
+  <body>
+    <div style="padding: 20px">
+        <div class="row">
+            <div class="col-md-5">
+                <h3>Data Selection and Aggregation</h3>
+                <div style="background-color: #DDD; padding: 20px;">
+                    <!-- <div class="form-group">
+                        <input type="radio"  name="inlineRadioOptions" id="inlineRadio1" value="option1"><strong>Grouping</strong>
+                    </div> -->
+                    <form>
+                      <div class="form-group row">
+                          <label class="col-sm-3 form-control-label" for="aggregateDataBy">Group By:</label>
+                          <div class="col-sm-9">
+                              <select class="form-control" id="aggregateDataBy">
+                                <option>Group Id</option>
+                                <option>Router Id</option>
+                                <option>Total Global Busy Time</option>
+                                <option>Total Global Traffic</option>
+                                <option>Total Local Busy Time</option>
+                                <option>Total Local Traffic</option>
+                              </select>
+                          </div>
+                      </div>
+                      <div class="form-group row">
+                        <label class="col-sm-3 form-control-label" for="numberOfPartition" >Number of Groups: </label>
+                        <div class="col-sm-9">
+                            <input id="numberOfPartition" type="text" />
+                         (<span id="numberOfPartitionVal">3</span>)
+                        </div>
+                      </div>
+
+                      <div class="form-group row">
+                          <label class="col-sm-3 form-control-label" for="aggregateDataBy">Size Encoding:</label>
+                          <div class="col-sm-9">
+                              <select class="form-control" id="visualMapSize">
+                                <option>Total Global Busy Time</option>
+                                <option>Total Global Traffic</option>
+                                <option>Total Local Busy Time</option>
+                                <option>Total Local Traffic</option>
+                              </select>
+                          </div>
+                      </div>
+
+                      <div class="form-group row">
+                          <label class="col-sm-3 form-control-label" for="filterSizeAttr"  >Filtering: </label>
+                          <div class="col-sm-9">
+                              <input id="filterSizeAttr" type="text" />
+                              <span style="margin-left: 10px" id="filterSizeAttrMin">0%</span> ~ <span id="filterSizeAttrMax">100%</span>
+                          </div>
+                      </div>
+
+                      <div class="form-group row">
+                          <label class="col-sm-3 form-control-label" for="aggregateDataBy">Color Encoding:</label>
+                          <div class="col-sm-9">
+                              <select class="form-control" id="visualMapSize">
+                                <option>Total Global Busy Time</option>
+                                <option>Total Global Traffic</option>
+                                <option>Total Local Busy Time</option>
+                                <option>Total Local Traffic</option>
+                              </select>
+                          </div>
+                      </div>
+
+                      <div class="form-group row">
+                          <label class="col-sm-3 form-control-label" for="filterColorAttr">Filtering: </label>
+                          <div class="col-sm-9">
+                              <input id="filterColorAttr" type="text" />
+                              <span style="margin-left: 10px" id="filterColorAttrMin">0%</span> ~ <span id="filterColorAttrMax">100%</span>
+                          </div>
+                      </div>
+                    </form>
+                </div>
+                <table class="table table-striped">
+                  <thead>
+                    <tr>
+                      <th class="col-md-1">Order</th>
+                      <th class="col-md-1">Entity</th>
+                      <th class="col-md-4">Visual Encoding</th>
+                      <th class="col-md-4">Color Mapping</th>
+                      <th class="col-md-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="networkViewSetting"> </tbody>
+                </table>
+            </div>
+            <div class="col-md-7">
+                <div id="networkView"></div>
+                <div id="aggrNetworkView"></div>
+            </div>
+        </div>
+
+    </div>
+    <script src="npm/jquery/dist/jquery.min.js"></script>
+    <script src="npm/jqueryui/jquery-ui.min.js"></script>
+    <script src="npm/bootstrap/dist/js/bootstrap.min.js"></script>
+    <script src="npm/bootstrap-slider/dist/bootstrap-slider.min.js"></script>
+    <script src="npm/bootstrap-colorpicker/dist/js/bootstrap-colorpicker.min.js"></script>
+    <script src="jam/require.js"></script>
+    <script src="lib/i2v.js"></script>
+    <script src="lib/p4.js"></script>
+    <script>
+        require([
+            'js/ringchart',
+            "p4/io/ajax",
+            "p4/io/parser",
+            "p4/core/datastruct",
+            "p4/core/pipeline",
+            "js/colorLegend",
+            'js/ringgrid',
+            'js/dragonfly-link',
+            'vui/dropdown',
+            "d3"
+        ], function(ringChart, ajax, dsv, dataStruct, pipeline, colorLegend,  ringGrid, interLinks,DropDownMenu, d3) {
+            const NUM_ROUTER = 1386,
+                NUM_GROUP = 99,
+                TERMINAL_PER_ROUTER = 7,
+                ROUTER_PER_GROUP = 14,
+                TERMINAL_PER_GROUP = TERMINAL_PER_ROUTER * ROUTER_PER_GROUP,
+                GLOBAL_LINK = 7;
+
+            var cache,
+                visualizeData = function(){},
+                partitionAttr = "group_id",
+                numPartition = 3;
+
+            new Slider("#numberOfPartition", {
+            	min: 2,
+                max: NUM_GROUP,
+            	value: 3
+            });
+
+            $("#numberOfPartition").on("change", function(slider){
+                // console.log(slider.value);
+                _update(slider.value.newValue);
+                $("#numberOfPartitionVal").text(slider.value.newValue);
+            });
+
+
+            ["#filterSizeAttr", "#filterColorAttr"].forEach(function(filterAttr){
+                var slider = new Slider(filterAttr, {
+                    min: 0,
+                    max: 1,
+                    step: 0.01,
+                    range: true,
+                    tooltip: "hide",
+                    id: "slider"+filterAttr.slice(1),
+                    value: [0.0, 1.0]
+                });
+
+                $(filterAttr).on("change", function(slider){
+                    $(filterAttr+"Min").text((slider.value.newValue[0]*100).toFixed(0)+"%");
+                    $(filterAttr+"Max").text((slider.value.newValue[1]*100).toFixed(0)+"%");
+                });
+
+                $("#slider" + filterAttr.slice(1) + " .slider-selection").css({background: "steelblue"});
+            })
+
+            function _update(value){
+                numPartition = value;
+                visualizeData(cache);
+            }
+
+            $("#aggregateDataBy").on("change", function(d){
+                partitionAttr = $(this).val().toLowerCase().split(" ").join("_");
+                console.log(partitionAttr);
+                visualizeData(cache);
+            })
+
+            function linearColor(c) {
+                var colors = i2v.colors(c).colors;
+                return [colors[0], colors[colors.length-1]];
+            }
+
+            var viewRightWidth = 600,
+                structs = [
+                    {
+                        entity: "router",
+                        level: "router",
+                        vmap: {color: "global_traffic"},
+                        type: 'links',
+                        colors: linearColor("OrRd")
+                    },
+                    {
+                        entity: "router",
+                        level: "router",
+                        vmap: {color: "global_busy_time"},
+                        aggregate: true,
+                        type: 'bar',
+                        colors: ['green', 'yellow'],
+                        size: 1,
+                    },
+                    {
+                        entity: "router",
+                        level: "router",
+                        vmap: {size: "local_traffic", color: "local_busy_time"},
+                        size: 2,
+                        type: 'bar',
+                        colors: ['white', 'steelblue'],
+                        aggregate: true
+                    },
+                    {
+                        entity: "terminal",
+                        level: "group",
+                        vmap: {color: "busy_time", size: "data_size"},
+                        size: 4,
+                        type: 'bar',
+                        aggregate: true,
+                        colors: ["steelblue", "purple"]
+                    },
+                ];
+
+            var entities = ["terminal","router"],
+                granularities = ["group", "router", "node/port"];
+
+            var metadata = {
+                router: {
+                    group: ["local_busy_time", "global_busy_time", "local_traffic", "global_traffic"],
+                    router: ["local_busy_time", "global_busy_time", "local_traffic", "global_traffic"],
+                    node: ["type", "busytime", "traffic"]
+                },
+                terminal: {
+                    group: ["data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time"],
+                    router: ["data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time"],
+                    node: ["data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time"]
+                }
+            };
+
+            var dataStore = {
+                router: {group: [], router: [], node: []},
+                terminal: {group: [], router: [], node: []}
+            };
+
+            var terminalStats, dp2;
+
+            function setDragonflyLink(num_routers, num_groups, num_links) {
+                var router_per_group = num_routers / num_groups,
+                    links = [];
+
+                for(var i = 0; i<num_routers; i++){
+                    var router_id = i,
+                        group_id = Math.floor(router_id / router_per_group);
+
+                        router_id = i % router_per_group;
+                    var first = router_id % num_routers;
+                    var dest = [];
+                    for (var j=0; j < num_links; j++) {
+                        var target_grp = first;
+                        if(target_grp == group_id) {
+                            target_grp = num_groups - 1;
+                        }
+                        var my_pos = group_id % router_per_group;
+                        if(group_id == num_groups - 1) {
+                            my_pos = target_grp % router_per_group;
+                        }
+
+                        var target_pos =  target_grp * router_per_group + my_pos;
+                        first += router_per_group;
+                        dest.push(target_pos);
+                    }
+                    links[i] = dest;
+                }
+
+                return function(router_id) {
+                    return links[router_id];
+                }
+            }
+
+            ajax.getAll([
+                {
+                    // url: "/uniformRandom/nonmin/dragonfly-router-stats",
+                    url: "/dfly-9k-adaptive-uniformRandom/dragonfly-router-stats",
+                    dataType: "text"
+                },
+                {
+                    // url: "/uniformRandom/nonmin/dragonfly-router-traffic",
+                    url: "/dfly-9k-adaptive-uniformRandom/dragonfly-router-traffic",
+                    dataType: "text"
+                },
+                {
+                    // url: "/uniformRandom/nonmin/dragonfly-msg-stats",
+                    url: "/dfly-9k-adaptive-uniformRandom/dragonfly-msg-stats",
+                    dataType: "text"
+                }
+            ]).then(function(text){
+                // console.log(text[0]);
+                var traffic = dataStruct({
+                    array: dsv(text[0], " "),
+                    header: ["lp_id", "group_id", "router_id", "local_traffic", "global_traffic"],
+                    types: ["int", "int", "int", "veci"+ROUTER_PER_GROUP, "veci"+GLOBAL_LINK],
+                    skip: 2,
+                }).objectArray();
+                // console.log(traffic);
+                var busytime = dataStruct({
+                    array: dsv(text[1], " "),
+                    header: ["lp_id", "group_id", "router_id", "local_busy_time", "global_busy_time"],
+                    types: ["int", "int", "int", "veci"+ROUTER_PER_GROUP, "veci"+GLOBAL_LINK],
+                    skip: 2,
+                }).objectArray();
+
+                var data = dataStruct.join(traffic, busytime);
+
+                var terminals = dataStruct({
+                    array: dsv(text[2], " "),
+                    header: ["lp_id", "terminal_id", "data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time"],
+                    types: ["int", "int", "int", "float", "float", "float", "float"],
+                    skip: 1
+                }).objectArray();
+
+                pipeline().derive(function(d){
+                    d.router_id = Math.floor(d.terminal_id / TERMINAL_PER_ROUTER);
+                    d.router_port = d.terminal_id % TERMINAL_PER_ROUTER;
+                    d.router_rank = d.router_id % ROUTER_PER_GROUP;
+                })(terminals);
+
+                terminalStats = p4.stats(terminals, ["data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time", "router_port"]);
+
+                dataStore.terminal.router = pipeline().group({
+                    $by: "router_id",
+                    data_size: "$sum",
+                    avg_packet_latency: "$avg",
+                    packets_finished: "$sum",
+                    avg_hops: "$avg",
+                    busy_time: "$sum"
+                }).derive(function(d){d.group_id = Math.floor(d.router_id / ROUTER_PER_GROUP); })(terminals);
+
+                dataStore.terminal.group = pipeline().group({
+                    $by: "group_id",
+                    data_size: "$sum",
+                    avg_packet_latency: "$avg",
+                    packets_finished: "$sum",
+                    avg_hops: "$avg",
+                    busy_time: "$sum"
+                })(dataStore.terminal.router);
+
+                var linkMap = setDragonflyLink(NUM_ROUTER, NUM_GROUP, GLOBAL_LINK),
+                    aggrNodeMap = [];
+
+                data.forEach(function(d){
+                    d.router_id = d.group_id * ROUTER_PER_GROUP + d.router_id;
+                    d.targets = linkMap(d.router_id);
+                    d.total_local_traffic = d.local_traffic.reduce(function(a, b){return a+b;});
+                    d.total_local_busy_time = d.local_busy_time.reduce(function(a, b){return a+b;});
+                    d.total_global_busy_time = d.global_busy_time.reduce(function(a, b){return a+b;});
+                    d.total_global_traffic = d.global_traffic.reduce(function(a, b){return a+b;});
+                });
+
+                data.embed({$by: "router_id", terminals: terminals});
+
+                dataStore.router.router = data;
+                cache = data;
+
+                dataStore.router.group = pipeline().group({
+                    $by: "group_id",
+                    total_local_traffic: "$sum",
+                    total_local_busy_time: "$sum",
+                    total_global_traffic: "$sum",
+                    total_global_busy_time: "$sum"
+                })(dataStore.router.router);
+
+                visualizeData = function (data){
+                    var sortKeys = {};
+                    sortKeys[partitionAttr] = 1;
+                    sortKeys.router_id = 1;
+                    var dataProcess = pipeline()
+                    .sortBy(sortKeys)
+                    // .sortBy({total_global_traffic:1})
+                    .partition(numPartition)
+                    // .binAggregate({total_global_busy_time: numPartition})
+                    .derive(function(d, i){
+                        d.src = d.data.map(function(a){return a.router_id;});
+                        d.dest = [];
+                        d.globalTraffic = [];
+                        d.globalBusyTime = [];
+                        d.data.forEach(function(a){d.dest = d.dest.concat(a.targets);});
+                        d.data.forEach(function(a){
+                            d.globalTraffic = d.globalTraffic.concat(a.global_traffic);
+                            d.globalBusyTime = d.globalBusyTime.concat(a.global_busy_time);
+                        });
+
+                        d.src.forEach(function(s){
+                            aggrNodeMap[s] = i;
+                        })
+                        // console.log(d.traffic.length, d.dest.length);
+                    })
+                    .derive(function(d){
+                        d.links = [];
+                        for(var j = 0; j < numPartition; j++){
+                            d.links[j] = 0;
+                            d.links[j] = { busytime: 0, traffic: 0, count: 0 };
+                        }
+
+                        d.dest.forEach(function(dest, di){
+                            d.links[aggrNodeMap[dest]].traffic += d.globalTraffic[di];
+                            d.links[aggrNodeMap[dest]].busytime += d.globalBusyTime[di];
+                            d.links[aggrNodeMap[dest]].count++;
+                        });
+
+                        d.counts = d.links.map(function(a){return a.count});
+                        d.traffics = d.links.map(function(a){return a.traffic});
+                        d.busytimes = d.links.map(function(a){return a.busytime});
+                        d.terminals = [];
+                        d.data.forEach(function(a){d.terminals = d.terminals.concat(a.terminals);});
+                        delete d.dest;
+                        delete d.src;
+                        delete d.traffic;
+                        // delete d.data;
+                    });
+                    // circularView();
+
+                    var result = dataProcess(data);
+                    // console.log(result);
+                    viz({data: result});
+                }
+                //
+                // $("#networkView").css({width: 250}).append(colorLegend({width: 200, height: 20, colors: ["#0E0","yellow","red"], domain: [0, 2000] }))
+
+                function getAttr(e, g) {
+                    var a = metadata[e][g].filter(function(n){
+                        return (["timestamp", "rank", "port", "router_id", "group_id", "type"].indexOf(n)===-1);
+                    })
+
+                    return ['----'].concat(a);
+                }
+
+                structs.forEach(function(struct, si){
+                    var tr = $("<tr/>"), td = $("<td/>");
+
+                    var attributes = getAttr(struct.entity, struct.level),
+                        e = DropDownMenu({options: entities, selected: entities.indexOf(struct.entity)}),
+                        g = DropDownMenu({options: granularities, selected: granularities.indexOf(struct.level)}),
+                        sizeAttr = DropDownMenu({float: "none", label: "size", options: attributes, selected: attributes.indexOf(struct.vmap.size)}),
+                        colorAttr = DropDownMenu({float: "none", label: "color", options: attributes, selected: attributes.indexOf(struct.vmap.color)});
+
+                    e.onchange = function(_) {
+                        if(_=='----') return;
+                        struct.entity = _;
+                        sizeAttr.changeOptions(getAttr(struct.entity, struct.level), 0);
+                        colorAttr.changeOptions(getAttr(struct.entity, struct.level), 0);
+                    };
+
+                    g.onchange = function(_) {
+                        if(_=='----') return;
+                        if(_ == "node/port") _ = "node";
+                        struct.level = _;
+                        sizeAttr.changeOptions(getAttr(struct.entity, struct.level));
+                        colorAttr.changeOptions(getAttr(struct.entity, struct.level));
+                    }
+
+                    var colorDomain = p4.stats(dataStore[struct.entity][struct.level], [struct.vmap.color])[struct.vmap.color],
+                        colorMap = colorLegend({width: 200, height: 20, colors: struct.colors, domain: [colorDomain.min, colorDomain.max] }),
+                        colorPicks = [];
+
+                    struct.colors.forEach(function(c){
+                        var colorPick = $("<a/>")
+                            .addClass("btn btn-default")
+                            .css({
+                                width: "22px",
+                                padding: 2,
+                                marginRight: "10px"
+                                // border: "none",
+                            })
+                            .append($("<span/>")
+                                .addClass("input-group-addon")
+                                .css({width: "16px", padding: 0})
+                                .append("<i/>"));
+                        colorPick.colorpicker({color: c}).on("changeColor", function(e){console.log(e.color.toHex());});
+
+                        colorPicks.push(colorPick);
+                    })
+
+                    tr.append([
+                        $("<td/>").text(si),
+                        $("<td/>").append(e),
+                        $("<td/>").append([$("<p/>").append(colorAttr), $("<p/>").append(sizeAttr)]),
+                        $("<td/>").append(colorMap),
+                        $("<td/>").append(colorPicks),
+                    ]);
+
+                    $("#networkViewSetting").append(tr);
+                });
+
+                // function circularView(arg){
+                //     var option = arg || {},
+                //         width = option.width || 600,
+                //         height = option.height || width,
+                //         linkRadius = option.linkRadius || width / 4;
+                //
+                //     var svg = i2v.Svg({width: width, height: height, container: "networkView"});
+                //
+                //     structs.forEach(function(s, si){
+                //         if(!s.config) return;
+                //         var result = (s.data) ? s.data : dataStore[s.entity][s.level];
+                //         // console.log(result.length);
+                //         var ring = ringChart({
+                //             data: result,
+                //             vmap: s.vmap,
+                //             width: width,
+                //             height: height,
+                //             outerRadius: s.radius + s.thick,
+                //             innerRadius: s.radius,
+                //             color: s.color || 120,
+                //             circle: s.circle,
+                //             container: svg,
+                //             // dataRange: stats[s.entity][s.level].stats
+                //         });
+                //
+                //         // rings[si] = ring;
+                //     })
+                //
+                //     var linkData = [];
+                //     dataStore.router.router.forEach(function(d){
+                //         var link;
+                //         d.global_busy_time.forEach(function(b, bi){
+                //             link = {};
+                //             link.busy_time = b;
+                //             link.traffic = d.global_traffic[bi];
+                //             linkData.push(link);
+                //         });
+                //     });
+                //
+                //     // console.log(linkData);
+                //
+                //     var links = interLinks({
+                //         data: linkData,
+                //         vmap: {color:  "busy_time", size: "traffic"},
+                //         width: width,
+                //         height: height,
+                //         radius: linkRadius,
+                //         container: svg,
+                //         // colors: i2v.colors("YlOrRd").colors,
+                //         colors: i2v.colors("Oranges").colors,
+                //         numRouter: NUM_ROUTER,
+                //         numTerminal: NUM_ROUTER * TERMINAL_PER_ROUTER,
+                //         numGroup: NUM_GROUP,
+                //         numLink: GLOBAL_LINK,
+                //         // dataRange: stats.router.node.stats
+                //         // color: s.color || 120,
+                //         // circle: s.circle,
+                //     });
+                //
+                //     var groupGrid = ringGrid({
+                //         width: width,
+                //         height: height,
+                //         innerRadius: linkRadius,
+                //         outerRadius: width/2,
+                //         count: NUM_GROUP,
+                //         container: svg,
+                //         onhover: function(d) {
+                //             // if(onhover) onhover(d);
+                //             links.select(d);
+                //         }
+                //     });
+                //     groupGrid.onmouseleave = function() {
+                //         // if(onhover) onhover(-1);
+                //         links.select(-1);
+                //     }
+                // }
+                });
+
+                function vectorAdd(a, b){
+                    var c = [];
+                    a.forEach(function(v, i){
+                        c[i] = v + b[i];
+                    });
+
+                    return c;
+                }
+
+                function vectorSum(vectors){
+                    var result = vectors[0],
+                        len = vectors[0].length;
+
+                    for(var i = 1; i < len; i++){
+                        result = vectorAdd(result, vectors[i]);
+                    }
+
+                    return result;
+                }
+
+                function viz(option) {
+                    $("#aggrNetworkView").html('');
+                    var data = option.data,
+                        width = option.width || 900,
+                        height = option.height || width,
+                        vmap = option.vmap,
+                        outerRadius = option.outerRadius || Math.min(width/2, height/2),
+                        innerRadius = option.innerRadius || outerRadius * 0.4;
+
+                    var matrix = data.map(function(d){
+                        // return d.busytimes;
+                        // return d.traffics;
+                        return d.counts;
+                        // return d[structs[0].vmap.size];
+                    });
+
+                    var chord = d3.layout.chord()
+                        .padding(0.8/numPartition)
+                        .sortSubgroups(d3.descending)
+                        .matrix(matrix);
+
+                    var values = [];
+                    data.forEach(function(d){
+                        values = values.concat(d.traffics);
+                    });
+
+                    var colorScale = d3.scale.linear().domain([ d3.min(values), d3.max(values) ]).range(linearColor("OrRd"));
+
+                    var svg = d3.select("#aggrNetworkView").append("svg")
+                        .attr("width", width)
+                        .attr("height", height)
+                      .append("g")
+                        .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+
+                    function coord(r, d){
+                        return [
+                             r*Math.cos(d- Math.PI / 2),
+                             r*Math.sin(d- Math.PI / 2)
+                        ];
+                    }
+
+                    var routers = [], vectorSet = [], terminals = [];
+
+                    structs.slice(1).forEach(function(s){
+                        s.data = [];
+                    })
+
+                    chord.groups().forEach(function(d, di){
+                        var start = d.startAngle, delta = (d.endAngle - d.startAngle ) / data[d.index].data.length;
+
+                        var routerAttr = {};
+
+                        routerAttr.busytime = vectorSum(data[d.index].data.map(function(a){return a.local_busy_time;}));
+                        routerAttr.traffic = vectorSum(data[d.index].data.map(function(a){return a.local_busy_time;}));
+
+                        var delta2 = (d.endAngle - d.startAngle ) / routerAttr.busytime.length;
+
+                        routerAttr.busytime.forEach(function(b, bi){
+                            var end = start + delta2;
+                            vectorSet.push({startAngle: start, endAngle: end, index: bi, busytime: b, traffic: routerAttr.traffic[bi]});
+                            start = end;
+                        });
+                        //
+                        start = d.startAngle;
+
+                        data[d.index].data.forEach(function(t, ti){
+                            var end = start + delta;
+                            routers.push({startAngle: start, endAngle: end, index: ti, value: t.total_global_busy_time});
+                            start = end;
+                        });
+
+                        structs.slice(1).forEach(function(s){
+                            if(s.entity == "router"){
+                                if(s.aggregate){
+                                    Object.keys(s.vmap).forEach(function(m){
+                                        var entry = {};
+                                        entry[s.vmap[m]] = vectorSum(data[d.index].data.map(function(a){return a[s.vmap[m]];}));
+                                        s.data.push(entry);
+                                    });
+                                } else {
+
+                                    data[d.index].data.forEach(function(r, ri){
+                                        var end = start + delta;
+                                        var entry = {startAngle: start, endAngle: end, index: ri};
+                                        Object.keys(s.vmap).forEach(function(m){
+                                            var key = "total_" + s.vmap[m];
+                                            console.log(key);
+                                            entry[key] = r[key];
+                                        });
+                                        s.data.push(entry);
+                                        start = end;
+                                    });
+                                }
+
+                            } else {
+                                if(s.aggregate) {
+                                    var entries = pipeline().group({
+                                        $by: ['router_port', 'router_rank'],
+                                        avg_hops: "$avg",
+                                        busy_time: "$avg",
+                                        data_size: "$avg",
+                                        packets_finished: "$avg",
+                                        avg_packet_latency: "$avg"
+                                    })(data[d.index].terminals);
+                                    entries.forEach(function(td){ td.startAngle = d.startAngle; td.endAngle = d.endAngle; });
+                                    s.data = s.data.concat(entries);
+
+                                } else {
+                                    data[d.index].terminals.forEach(function(td){ td.startAngle = d.startAngle; td.endAngle = d.endAngle; });
+                                    s.data = s.data.concat(data[d.index].terminals);
+                                }
+                            }
+                        });
+
+                        var terminalData = pipeline().group({
+                            $by: ['router_port', 'router_rank'],
+                            avg_hops: "$avg",
+                            busy_time: "$avg",
+                            data_size: "$avg",
+                            packets_finished: "$avg",
+                            avg_packet_latency: "$avg"
+                        })(data[d.index].terminals);
+
+                        terminalData.forEach(function(td){ td.startAngle = d.startAngle; td.endAngle = d.endAngle; });
+                        terminals = terminals.concat(terminalData);
+                    });
+
+                    svg.append("g")
+                        .attr("class", "chord")
+                      .selectAll("path")
+                        .data(chord.chords)
+                      .enter().append("path")
+                        .attr("d", d3.svg.chord().radius(innerRadius))
+                        // .style("fill", function(d) { return fill(d.target.index); })
+                        .style("fill", function(d){return colorScale(data[d.source.index].traffics[d.target.index]); })
+                        .style("stroke", function(d){return colorScale(data[d.source.index].traffics[d.target.index]); })
+                        .style("opacity", 1);
+
+                    var values = routers.map(function(d){return d.value;});
+
+                    var fill = d3.scale.linear()
+                        .domain([d3.min(values), d3.max(values)])
+                        .range(structs[1].colors);
+
+                    svg.append("g").selectAll("path")
+                        .data(routers)
+                      .enter().append("path")
+                        .style("fill", function(d) { return fill(d.value); })
+                        .style("stroke", function(d) { return fill(d.value); })
+                        .attr("d", d3.svg.arc().innerRadius(innerRadius).outerRadius(innerRadius+20));
+
+                    var busytimes = vectorSet.map(function(d){return d.busytime;}),
+                        traffics = vectorSet.map(function(d){return d.traffic;});
+
+                    var fill2 = d3.scale.linear()
+                        .domain([d3.min(busytimes), d3.max(busytimes)])
+                        .range(["white", "steelblue"]);
+
+                    var barHeight =  d3.scale.linear()
+                        .domain([d3.min(traffics), d3.max(traffics)])
+                        .range([innerRadius+30, innerRadius+80]);
+
+                    svg.append("g").selectAll("path")
+                        .data(vectorSet)
+                      .enter().append("path")
+                        .style("fill", function(d) { return fill2(d.busytime); })
+                        .style("stroke", "#aaa")
+                        .attr("d", function(d) { return d3.svg.arc().innerRadius(innerRadius+30).outerRadius(barHeight(d.traffic))(d) });
+
+                    svg.append("g").selectAll("path")
+                        .data(chord.groups)
+                      .enter().append("path")
+                        .style("fill", "transparent")
+                        .style("stroke", "none")
+                        .attr("d", d3.svg.arc().innerRadius(innerRadius).outerRadius(innerRadius+20))
+                        .on("mouseover", fade(0.1))
+                        .on("mouseout", fade(1));
+
+                    svg.append("g").selectAll("path")
+                        .data(chord.groups)
+                      .enter().append("path")
+                        .style("fill", "transparent")
+                        .style("stroke", "#aaa")
+                        .attr("d", d3.svg.arc().innerRadius(innerRadius+90).outerRadius(outerRadius-80))
+                        .on("click", fade(0.1))
+                        .on("mouseout", fade(1));
+
+                    var terminalStats = p4.stats(terminals, ["data_size", "avg_packet_latency", "packets_finished", "avg_hops", "busy_time", "router_port", "router_rank"]);
+
+
+                    var dotFill = d3.scale.linear()
+                        .domain([terminalStats.busy_time.min, terminalStats.busy_time.max])
+                        .range(["steelblue", "purple"]);
+
+                    var dotSize = d3.scale.linear()
+                        .domain([terminalStats.avg_hops.min, terminalStats.avg_hops.max])
+                        .range([0.5, 5]);
+
+                    var dataSizeScale = d3.scale.linear()
+                        .domain([terminalStats.router_port.min - 0.5, terminalStats.router_port.max + 0.5])
+                        .range([innerRadius+90, outerRadius-80]);
+
+                    terminals.forEach(function(d, di){
+
+                        var latencyScale = d3.scale.linear()
+                            .domain([terminalStats.router_rank.min - 0.5, terminalStats.router_rank.max + 0.5])
+                            .range([d.startAngle, d.endAngle]);
+
+                        var pos = coord(dataSizeScale(d.router_port), latencyScale(d.router_rank));
+
+                        d.cx = pos[0];
+                        d.cy = pos[1];
+
+                    });
+
+                    // console.log(terminals);
+
+                    svg.selectAll(".dot")
+                          .data(terminals)
+                        .enter().append("circle")
+                          .attr("class", "dot")
+                          .attr("r", function(d){return dotSize(d.avg_hops)})
+                          .attr("cx", function(d){return d.cx})
+                          .attr("cy",function(d){return d.cy})
+                          .style("fill", function(d){return dotFill(d.busy_time)})
+                          .style("fill-opacity", 0.5);
+
+                    // Returns an array of tick angles and labels, given a group.
+                    function groupTicks(d) {
+                      var k = (d.endAngle - d.startAngle) / d.value;
+                      return d3.range(0, d.value, 1000).map(function(v, i) {
+                        return {
+                          angle: v * k + d.startAngle,
+                          label: i % 5 ? null : v / 1000 + "k"
+                        };
+                      });
+                    }
+
+                    // Returns an event handler for fading a given chord group.
+                    function fade(opacity) {
+                      return function(g, i) {
+                        svg.selectAll(".chord path")
+                            .filter(function(d) { return d.source.index != i && d.target.index != i; })
+                          .transition()
+                            .style("opacity", opacity);
+                      };
+                    }
+                }
+
+            })
+
+
+
+    </script>
+
+  </body>
+</html>
